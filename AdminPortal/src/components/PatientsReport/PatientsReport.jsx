@@ -20,6 +20,7 @@ const PatientsReport = () => {
 
     const [patientsList, setAllPatientsList]= useState([]);
     const [loading,setLoading] = useState(false)
+    const empcode = sessionStorage.getItem('empcode')
 
     console.log(sDate,eDate)
 
@@ -59,7 +60,8 @@ const PatientsReport = () => {
           const res = await axios.post(`${BASEURL}/admin/getPatientsList`,{
             catId :subCatId, 
             startDate : sDate, 
-            endDate:eDate
+            endDate:eDate,
+            empcode:empcode
 
           });
           setAllPatientsList(res.data.data)

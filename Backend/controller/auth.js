@@ -7,7 +7,7 @@ exports.login = async (req, res) => {
   console.log("login function triggered")
   const { empcode, password } = req.body;
   console.log(empcode, password)
-  const query = 'select user_id, empcode, password, role,designation from user_mst where empcode=? and password = ? and status = "Y"';
+  const query = 'select user_id, empcode, password, role,designation,name from user_mst where empcode=? and password = ? and status = "Y"';
 
   try {
     db.query(query, [empcode,password], (err, result) => {
@@ -62,7 +62,8 @@ exports.login = async (req, res) => {
                   user_id: user.user_id,
                   role: user.role,
                   designation:user.designation,
-                  sessionID:historyId
+                  sessionID:historyId,
+                  name:user.name,
                 },
                 status: "SUCCESS",
                 details: "",

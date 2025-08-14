@@ -17,6 +17,8 @@ function Navbar({ children }) {
 
       const [isSidebarVisible, setIsSidebarVisible] = useState(false);
 
+      const userName = sessionStorage.getItem('EmployeeName')
+
       const toggleSidebar = () => {
         setIsSidebarVisible(!isSidebarVisible);
       };
@@ -133,7 +135,7 @@ function Navbar({ children }) {
                         
                             <li className="nav-item dropdown no-arrow dropdown1">
                                 <div className="nav-link dropdown-toggle">
-                                    <span className="mr-2 d-none d-lg-inline text-gray-600 small">Admin</span>
+                                    <span className="mr-2 d-none d-lg-inline text-gray-600 small">{userName || "Admin"}</span>
                                     <img className="img-profile rounded-circle" src="/images/userimg.png" alt="Profile" />
                                 </div>
                               

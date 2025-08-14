@@ -21,11 +21,13 @@ const Login = () => {
         const designation = res.data.responseData.designation;
         const role = res.data.responseData.role;
         const userId = res.data.responseData.user_id;
+        const name = res.data.responseData.name;
         sessionStorage.setItem('empcode',empcode)
         sessionStorage.setItem('role',role)
         sessionStorage.setItem('designation',designation)
         sessionStorage.setItem('userId',userId)
         sessionStorage.setItem('UserLoggedIn',"true")
+        sessionStorage.setItem('EmployeeName',name)
         console.log("res : ",res)
         if(role === "1" && res.data.errorCode === "1"){
             sessionStorage.setItem("IsAdminLoggedIn","true")

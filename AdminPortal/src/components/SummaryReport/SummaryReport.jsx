@@ -12,6 +12,8 @@ const SummaryReport = () => {
   
   
     const [subCatData, SetSubCatData]= useState([]);
+    const empcode = sessionStorage.getItem('empcode')
+    console.log("empcode : ",empcode)
 
 
     const [subCatId, setSubCatId] = useState("");
@@ -57,14 +59,14 @@ const SummaryReport = () => {
       try {
         let res
         if(!subCatId){
-          res = await axios.post(`${BASEURL}/admin/getReportNumberWise?startDate=${sDate}&endDate=${eDate}&subCatId=${0}`)
+          res = await axios.post(`${BASEURL}/admin/getReportNumberWise?startDate=${sDate}&endDate=${eDate}&subCatId=${0}&empcode=${empcode}`)
 
         }else{
 
-          res = await axios.post(`${BASEURL}/admin/getReportNumberWise?startDate=${sDate}&endDate=${eDate}&subCatId=${subCatId}`)
+          res = await axios.post(`${BASEURL}/admin/getReportNumberWise?startDate=${sDate}&endDate=${eDate}&subCatId=${subCatId}&empcode=${empcode}`)
         }
-
-        setReportNumberWise(res.data[0])
+        console.log("REsponse : ",res)
+        setReportNumberWise(res.data.data)
       } catch (error) {
         console.log(error)
       }

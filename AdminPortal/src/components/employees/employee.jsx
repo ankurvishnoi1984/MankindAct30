@@ -32,6 +32,8 @@ function Employee() {
     const [searchQuery, setSearchQuery] = useState("")
     const [totalCount, setTotalCount] = useState(0)
     const [currentPage,setCurrentPage] = useState(1)
+
+    const empc = sessionStorage.getItem('empcode')
     
   
     const handelAddUser =()=>{
@@ -146,7 +148,7 @@ function Employee() {
     
     async function GetEmpData(){
         try {
-            const res = await axios.get(`${BASEURL}/admin/getAllEmployee?page=${currentPage}&limit=20&searchName=${searchQuery}`);
+            const res = await axios.get(`${BASEURL}/admin/getAllEmployee?page=${currentPage}&limit=20&searchName=${searchQuery}&empcode=${empc}`);
             console.log("inside empdata",res?.data?.users)
             setTotalCount(res?.data?.totalCount)
             setEmpData(res?.data?.users)

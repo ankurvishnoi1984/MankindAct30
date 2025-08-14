@@ -1015,19 +1015,60 @@ exports.getTopLine = async (req, res) => {
 };
 
 exports.getAllEmployee = async (req, res) => {
-
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 20;
   const offset = (page - 1) * limit;
   const searchName = req.query.searchName || '';
+  const empcodeFilter = req.query.empcode || ''; // empcode from request
 
+  // Recursive CTE to get empcode and all subordinates
+  const baseCTE = `
+    WITH RECURSIVE employee_hierarchy AS (
+      SELECT 
+        user_id,
+        name,
+        empcode,
+        hq,
+        state,
+        reporting
+      FROM user_mst
+      WHERE status = 'Y'
+        ${empcodeFilter ? `AND empcode = '${empcodeFilter}'` : ''}
 
-  const query =`select user_id,name,empcode,hq,state,reporting from user_mst where name LIKE '%${searchName}%' AND status = 'Y' LIMIT ${limit} OFFSET ${offset}`
-  totalRowCountQuery = `SELECT COUNT(*) as totalCount FROM user_mst where name LIKE '%${searchName}%' AND status = 'Y'`;
+      UNION ALL
+
+      SELECT 
+        u.user_id,
+        u.name,
+        u.empcode,
+        u.hq,
+        u.state,
+        u.reporting
+      FROM user_mst u
+      INNER JOIN employee_hierarchy eh 
+        ON u.reporting = eh.empcode
+      WHERE u.status = 'Y'
+    )
+  `;
+
+  const dataQuery = `
+    ${baseCTE}
+    SELECT *
+    FROM employee_hierarchy
+    WHERE name LIKE '%${searchName}%'
+    LIMIT ${limit} OFFSET ${offset};
+  `;
+
+  const countQuery = `
+    ${baseCTE}
+    SELECT COUNT(*) AS totalCount
+    FROM employee_hierarchy
+    WHERE name LIKE '%${searchName}%';
+  `;
 
   try {
     const users = await new Promise((resolve, reject) => {
-      db.query(query, (err, result) => {
+      db.query(dataQuery, (err, result) => {
         if (err) {
           logger.error(err.message);
           reject(err);
@@ -1038,7 +1079,7 @@ exports.getAllEmployee = async (req, res) => {
     });
 
     const totalRowCountResult = await new Promise((resolve, reject) => {
-      db.query(totalRowCountQuery, (err, result) => {
+      db.query(countQuery, (err, result) => {
         if (err) {
           logger.error(err.message);
           reject(err);
@@ -1048,11 +1089,16 @@ exports.getAllEmployee = async (req, res) => {
       });
     });
 
-    res.status(200).json({users,totalCount:totalRowCountResult.totalCount})
+    res.status(200).json({
+      users,
+      totalCount: totalRowCountResult.totalCount
+    });
   } catch (error) {
-    res.send(error);
+    logger.error(error.message);
+    res.status(500).send(error);
   }
 };
+
 
 
 exports.deleteEmployee = async (req, res) => {
@@ -1250,36 +1296,79 @@ exports.deleteEmployee = async (req, res) => {
 
   // download report hierekeywise 
 
-  exports.getReportNumberWise = async (req, res) => {
-    const { subCatId,startDate,endDate } = req.query;
-    
-     
-    const query = 'CALL  AV_GetCampReportFinalSummary_DateRange(?,?,?)'
-    try {
-      db.query(query,[subCatId,startDate,endDate] ,(err, result) => {
-        if (err) {
+exports.getReportNumberWise = async (req, res) => {
+  const { subCatId, startDate, endDate, empcode } = req.query;
+  console.log("Params:", subCatId, startDate, endDate, empcode);
+
+  const query = 'CALL AV_GetCampReportFinalSummary_DateRange_NoTempTables(?,?,?,?)';
+
+  try {
+    db.query(query, [empcode,subCatId, startDate, endDate], (err, result) => {
+      if (err) {
         logger.error(err.message);
+        return res.status(500).json({
+          errorCode: "0",
+          errorDetail: err,
+          responseData: {},
+          status: "ERROR",
+          details: "An internal server error occurred",
+          getMessageInfo: "An internal server error occurred",
+        });
+      }
 
-          res.status(500).json({
-            errorCode: "0",
-            errorDetail: err,
-            responseData: {},
-            status: "ERROR",
-            details: "An internal server error occurred",
-            getMessageInfo: "An internal server error occurred",
-          });
-        } else {
-        logger.info('Fetched All Records in NumberWise');
+      logger.info('Fetched All Records in NumberWise');
 
-          res.status(200).json(result);
-        }
+      // Procedure results are usually in result[0]
+      let rows = result[0] || [];
+
+      res.status(200).json({
+        message: "Report fetched successfully",
+        errorCode: 1,
+        data: rows,
       });
-    } catch (error) {
-      logger.error(error.message);
+    });
+  } catch (error) {
+    logger.error(error.message);
+    res.status(500).json({
+      errorCode: "0",
+      errorDetail: error.message,
+      status: "ERROR",
+    });
+  }
+};
 
-      res.json(error);
+
+function filterByHierarchy(rows, rootEmpcode) {
+  const target = String(rootEmpcode).trim();
+  const allowed = new Set();
+
+  // Normalize rows
+  const normalizedRows = rows.map(r => ({
+    empcode: String(r.empcode).trim(),
+    reporting: r.reporting ? String(r.reporting).trim() : null,
+    ...r
+  }));
+
+  function collect(emp) {
+    if (!allowed.has(emp)) {
+      allowed.add(emp);
+      // find all whose reporting matches this emp
+      for (const r of normalizedRows) {
+        if (r.reporting === emp) {
+          collect(r.empcode);
+        }
+      }
     }
-  };
+  }
+
+  // Step 1: Add root directly (even if no one reports to them)
+  collect(target);
+
+  // Step 2: Return only allowed empcodes
+  return normalizedRows.filter(r => allowed.has(r.empcode));
+}
+
+
 
 
 exports.getReportDetailed = async (req, res) => {
@@ -1758,20 +1847,53 @@ GROUP BY
 
 
 exports.getPatientsList = async (req, res) => {
-  const { catId, startDate, endDate } = req.body;
+  const { catId, startDate, endDate, empcode } = req.body;
+
+  // Recursive CTE to get the employee hierarchy starting from empcode
+  let baseCTE = `
+    WITH RECURSIVE employee_hierarchy AS (
+      SELECT 
+        user_id,
+        name,
+        empcode,
+        designation,
+        reporting
+      FROM user_mst
+      WHERE status = 'Y'
+        ${empcode ? `AND empcode = ?` : ''}
+
+      UNION ALL
+
+      SELECT 
+        u.user_id,
+        u.name,
+        u.empcode,
+        u.designation,
+        u.reporting
+      FROM user_mst u
+      INNER JOIN employee_hierarchy eh
+        ON u.reporting = eh.empcode
+      WHERE u.status = 'Y'
+    )
+  `;
 
   let query = `
+    ${baseCTE}
     SELECT 
       p.pa_id, p.subcat_id, p.name, p.age, p.gender, p.bp, p.sbp, p.dbp,
       p.isHypertensive, p.tc, p.tg, p.nonhdl, p.hdl, p.ldl, p.ldlhdl, 
       p.created_date,
       u.name AS empname, u.designation
     FROM patient_mst AS p
-    LEFT JOIN user_mst u ON u.user_id = p.created_by
+    LEFT JOIN employee_hierarchy u ON u.user_id = p.created_by
     WHERE p.status = "Y"
   `;
 
   const params = [];
+
+  if (empcode) {
+    params.push(empcode);
+  }
 
   if (catId) {
     query += ` AND p.subcat_id = ?`;
