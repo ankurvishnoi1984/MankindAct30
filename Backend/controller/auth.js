@@ -4,13 +4,14 @@ const logger = require('../utils/logger')
 
 
 exports.login = async (req, res) => {
+  console.log("login function triggered")
   const { empcode, password } = req.body;
-  const query = 'select user_id, empcode, password, role from user_mst where empcode=? and password = ? and status = "Y"';
+  console.log(empcode, password)
+  const query = 'select user_id, empcode, password, role,designation from user_mst where empcode=? and password = ? and status = "Y"';
 
   try {
     db.query(query, [empcode,password], (err, result) => {
       if (err) {
-        
         logger.error(`Error in /controller/auth/login: ${err.message}. SQL query: ${query}`);
         return res.status(500).json({
           errorCode: "0",
@@ -21,7 +22,7 @@ exports.login = async (req, res) => {
           getMessageInfo: "An internal server error occurred"
         });
       } else if (result.length === 0) {
-        
+        console.log("res len err")
         return res.status(401).json({
           errorCode: "0",
           errorDetail: "Invalid Email or Password",
@@ -60,6 +61,7 @@ exports.login = async (req, res) => {
                   empID: user.empcode,
                   user_id: user.user_id,
                   role: user.role,
+                  designation:user.designation,
                   sessionID:historyId
                 },
                 status: "SUCCESS",

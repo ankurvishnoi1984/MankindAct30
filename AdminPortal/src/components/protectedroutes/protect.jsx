@@ -2,8 +2,8 @@ import { Navigate } from "react-router-dom";
 
 const AdminProtectdRoute = ({children}) => {
     
-    const isAdminLoggedIn = sessionStorage.getItem('IsAdminLoggedIn') === 'true';
-    if(!isAdminLoggedIn){
+    const userLoggedIn = sessionStorage.getItem('UserLoggedIn') === 'true';
+    if(!userLoggedIn){
         return <Navigate to='/'  replace={true}></Navigate>
      }
      return children;

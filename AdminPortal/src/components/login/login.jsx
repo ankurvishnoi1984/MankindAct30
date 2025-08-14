@@ -16,12 +16,25 @@ const Login = () => {
       e.preventDefault();
       console.log(username,password,BASEURL)
       try {
-        const res = await axios.post(`${BASEURL}/admin/login`,{username,password});
-        if(res.data.errorCode === "1"){
+        const res = await axios.post(`${BASEURL}/auth/login`,{empcode:username,password});
+        const empcode = res.data.responseData.empID;
+        const designation = res.data.responseData.designation;
+        const role = res.data.responseData.role;
+        const userId = res.data.responseData.user_id;
+        sessionStorage.setItem('empcode',empcode)
+        sessionStorage.setItem('role',role)
+        sessionStorage.setItem('designation',designation)
+        sessionStorage.setItem('userId',userId)
+        sessionStorage.setItem('UserLoggedIn',"true")
+        console.log("res : ",res)
+        if(role === "1" && res.data.errorCode === "1"){
             sessionStorage.setItem("IsAdminLoggedIn","true")
             navigate("/dashboard")
+        }else if(role !=="1" && res.data.errorCode === "1"){
+            sessionStorage.setItem("IsAdminLoggedIn","false")
+            navigate("/dashboard")
         }else{
-            setError("Invalid Credential");
+          setError("Invalid Credential");
         }
         
       } catch (error) {
