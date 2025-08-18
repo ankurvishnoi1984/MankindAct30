@@ -14,9 +14,12 @@ const Report = () => {
     const [downloadreport,setDownloadReport]= useState([])
     const [subCatData, SetSubCatData]= useState([]);
     const [topLineData, SetTopLineData]= useState([]);
-    const [repo, setRepo] = useState("");
-  
-    console.log("dowanload report",reportData)
+    const empLoggedIn = sessionStorage.getItem('empcode')
+    const IsAdminLoggedIn = sessionStorage.getItem('IsAdminLoggedIn')
+    const [repo, setRepo] = useState(IsAdminLoggedIn==="true"?"":empLoggedIn);
+    // const [repo, setRepo] = useState("");
+    const loggedInRole = sessionStorage.getItem('role')
+    
     const [topLine,SetTopLine] = useState("")
     const [fifthline,SetFifthLine] = useState([])
     const [fourthLine,SetFourthLine] = useState("")
@@ -32,7 +35,6 @@ const Report = () => {
     const [zeroLine,SetZeroLine] = useState("")
     const [getZeroline,SetgetZeroline] = useState([])
     const [searchQuery, setSearchQuery] = useState('');
-    //console.log('outsied',getFourthline)
 
     const [subCatId, setSubCatId] = useState("");
     const [rqid1 , setRqid1] = useState("");
@@ -51,7 +53,6 @@ const Report = () => {
    
     const [loading,setLoading] = useState(false)
 
-    console.log(sDate,eDate)
 
     const handelNext = () => {
         if (currentPage * entriesPerPage < pagelength) {
@@ -72,13 +73,15 @@ const Report = () => {
   const entriesPerPage = 20;
   const startingEntry = (currentPage - 1) * entriesPerPage + 1;
   //const endingEntry = 20;
-  //console.log("emplength",emplength)
   //const endingEntry = Math.min(startingEntry + entriesPerPage - 1, emplength);
   const endingEntry = Math.min(startingEntry + entriesPerPage - 1, pagelength);
 
     useEffect(()=>{
         //GetReportData();
         GetSubCatInfo();
+        if (IsAdminLoggedIn === "false"){
+          GetFifthLine(empLoggedIn)
+        }
         GetTopLine();
     },[])
     useEffect(()=>{
@@ -88,7 +91,6 @@ const Report = () => {
 
     useEffect(()=>{
       // GetReportData();
-      
       GetDownloadReportData();
   },[repo,subCatId,filter])
 
@@ -223,52 +225,68 @@ const Report = () => {
         }
     }
 
-    async function GetDownloadReportData(){
-        try {
-            setLoading(true)
-            let res;
-             if(filter && subCatId){
-                //console.log("hellow........")
-             res = await axios.get(`${BASEURL}/admin/downloadReportFilter?&filter=${filter}&subCatId=${subCatId}&empcode=${repo}&searchName=${searchQuery}`);
+  async function GetDownloadReportData() {
+    try {
+      setLoading(true);
 
-            }
-            else if(sDate && eDate && subCatId){
-                //console.log("hellow........")
-             res = await axios.get(`${BASEURL}/admin/downloadReportFilter?startDate=${sDate}&endDate=${eDate}&subCatId=${subCatId}&empcode=${repo}&searchName=${searchQuery}`);
+      let res;
+      let branch = ""; // track which condition executed
 
-            }
-            else if(sDate && eDate){
-                //console.log("hellow........")
-             res = await axios.get(`${BASEURL}/admin/downloadReportFilter?startDate=${sDate}&endDate=${eDate}&empcode=${repo}&searchName=${searchQuery}`);
 
-            }
-             else if(subCatId){
+      if (filter && subCatId) {
+        branch = "filter + subCatId";
+        res = await axios.get(
+          `${BASEURL}/admin/downloadReportFilter?&filter=${filter}&subCatId=${subCatId}&empcode=${repo}&searchName=${searchQuery}`
+        );
+      }
+      else if (sDate && eDate && subCatId) {
+        branch = "sDate + eDate + subCatId";
+        res = await axios.get(
+          `${BASEURL}/admin/downloadReportFilter?startDate=${sDate}&endDate=${eDate}&subCatId=${subCatId}&empcode=${repo}&searchName=${searchQuery}`
+        );
+      }
+      else if (sDate && eDate) {
+        branch = "sDate + eDate";
+        res = await axios.get(
+          `${BASEURL}/admin/downloadReportFilter?startDate=${sDate}&endDate=${eDate}&empcode=${repo}&searchName=${searchQuery}`
+        );
+      }
+      else if (subCatId) {
+        branch = "subCatId only";
+        res = await axios.get(
+          `${BASEURL}/admin/downloadReport?subCatId=${subCatId}&rqId1=${rqid1}&rqId2=${rqid2}&empcode=${repo}&searchName=${searchQuery}`
+        );
+      }
+      else if (filter) {
+        branch = "filter only";
+        res = await axios.get(
+          `${BASEURL}/admin/downloadReportFilter?&filter=${filter}&empcode=${repo}&searchName=${searchQuery}`
+        );
+      }
+      else {
+        branch = "default (empcode + searchName)";
+        res = await axios.get(
+          `${BASEURL}/admin/downloadReport?empcode=${repo}&searchName=${searchQuery}`
+        );
+      }
 
-             res = await axios.get(`${BASEURL}/admin/downloadReport?subCatId=${subCatId}&rqId1=${rqid1}&rqId2=${rqid2}&empcode=${repo}&searchName=${searchQuery}`);
-            }
-            else if(filter){
-                res = await axios.get(`${BASEURL}/admin/downloadReportFilter?&filter=${filter}&empcode=${repo}&searchName=${searchQuery}`);
-   
-               }
-            else{
+      // 🔍 one place to see which branch was taken
+      console.log("DownloadReportData branch:", branch,repo,res);
 
-               res = await axios.get(`${BASEURL}/admin/downloadReport?empcode=${repo}&searchName=${searchQuery}`);
-            }
-            if(res.status===200){
-              setLoading(false)
-              setDownloadReport(res.data)
-            }
-            else{
-              setLoading(false)
-              alert("error in report data fetching please try again")
-            }
-          
-        } catch (error) {
-           console.log(error) 
-           setLoading(false)
-           alert("error in report data fetching please try again")
-        }
+      if (res.status === 200) {
+        setDownloadReport(res.data);
+      } else {
+        alert("error in report data fetching please try again");
+      }
+
+    } catch (error) {
+      console.error(error);
+      alert("error in report data fetching please try again");
+    } finally {
+      setLoading(false);
     }
+  }
+
 
    
     // async function GetReportDataForCat(subCatId,rqid1,rqid2){
@@ -293,7 +311,6 @@ const Report = () => {
     async function GetTopLine(){
         try {
             const res = await axios.post(`${BASEURL}/admin/getEmp`,{empcode:0});
-            //console.log("topline",res.data)
             SetTopLineData(res.data)
         } catch (error) {
            console.log(error) 
@@ -303,7 +320,6 @@ const Report = () => {
     async function GetFifthLine(empcode){
         try {
             const res = await axios.post(`${BASEURL}/admin/getEmp`,{empcode});
-            //console.log("fifthline",res.data)
             SetFifthLine(res.data)
         } catch (error) {
            console.log(error) 
@@ -312,7 +328,6 @@ const Report = () => {
     async function GetFourthLine(empcode){
         try {
             const res = await axios.post(`${BASEURL}/admin/getEmp`,{empcode});
-            //console.log("fifthline",res.data)
             SetgetFourthline(res.data)
         } catch (error) {
            console.log(error) 
@@ -322,7 +337,6 @@ const Report = () => {
     async function GetThirdLine(empcode){
         try {
             const res = await axios.post(`${BASEURL}/admin/getEmp`,{empcode});
-            //console.log("thirdline",res.data)
             SetgetThirdline(res.data)
         } catch (error) {
            console.log(error) 
@@ -332,7 +346,6 @@ const Report = () => {
     async function GetSecondLine(empcode){
         try {
             const res = await axios.post(`${BASEURL}/admin/getEmp`,{empcode});
-            //console.log("second linnnnnnnnnnnnnnnnnnnn",res.data)
             SetgetSecondline(res.data)
         } catch (error) {
            console.log(error) 
@@ -342,7 +355,6 @@ const Report = () => {
     async function GetFirstLine(empcode){
         try {
             const res = await axios.post(`${BASEURL}/admin/getEmp`,{empcode});
-            //console.log("firest linnnnnnnnnnnnnnnnnnnn",res.data)
             SetgetFirstline(res.data)
         } catch (error) {
            console.log(error) 
@@ -352,7 +364,6 @@ const Report = () => {
     async function GetZeroLine(empcode){
         try {
             const res = await axios.post(`${BASEURL}/admin/getEmp`,{empcode});
-            //console.log("zero linnnnnnnnnnnnnnnnnnnn",res.data)
             SetgetZeroline(res.data)
         } catch (error) {
            console.log(error) 
@@ -362,46 +373,51 @@ const Report = () => {
     async function GetBottomLine(empcode){
         try {
             const res = await axios.post(`${BASEURL}/admin/getEmp`,{empcode});
-            //console.log("bottom linnnnnnnnnnnnnnnnnnnn",res.data)
             //SetgetZeroline(res.data)
         } catch (error) {
            console.log(error) 
         }
     }
     
-    const handelReportDownload = ()=>{
-        // Define custom column headers
-        const headers = [
-            'Employee Code',
-            'Employee Name',
-            'Total Camps',
-            'Total Doctor',
-            'Patient Screened',
-            'Patient Diagnosed',
-            'Prescription Generated',
-            'Role'
-          ];
+    const handelReportDownload = () => {
+  // Define custom column headers
+  const headers = [
+    'Employee Code',
+    'Employee Name',
+    'Total Camps',
+    'Total Doctor',
+    'Patient Screened',
+    'Patient Diagnosed',
+    'Prescription Generated',
+    'Role'
+  ];
 
-          
-      
-          // Map the data to match the custom column headers
-          const mappedData = downloadreport.map(item => ({
-            'Employee Code': item.emp_code,
-            'Employee Name': item.emp_name,
-            'Total Camps': item.camp_count,
-            'Total Doctor': item.doctor_count,
-            'Patient Screened': item.screened_count,
-            'Patient Diagnosed': item.diagnosed_count,
-            'Prescription Generated':item.prescription_count,
-            'Role':item.role
-          }));
-      
-          const ws = XLSX.utils.json_to_sheet(mappedData, { header: headers });
-          const wb = XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb, ws, 'Data');
-          XLSX.writeFile(wb, 'CampReportData.xlsx');
-        
-       }
+  // ✅ filter unwanted rows first
+  const filteredData = downloadreport.filter(item => {
+    if (item.emp_name === "Admin") return false;
+    if (item.role === "Top Line" && loggedInRole !== "1") return false;
+    return true;
+  });
+
+  // Map the data to match the custom column headers
+  const mappedData = filteredData.map(item => ({
+    'Employee Code': item.emp_code,
+    'Employee Name': item.emp_name,
+    'Total Camps': item.camp_count,
+    'Total Doctor': item.doctor_count,
+    'Patient Screened': item.screened_count,
+    'Patient Diagnosed': item.diagnosed_count,
+    'Prescription Generated': item.prescription_count,
+    'Role': item.role
+  }));
+
+  // Export to Excel
+  const ws = XLSX.utils.json_to_sheet(mappedData, { header: headers });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Data');
+  XLSX.writeFile(wb, 'CampReportData.xlsx');
+};
+
 
        const handelReportDownloadFromTop = ()=>{
         // Define custom column headers
@@ -561,68 +577,67 @@ const Report = () => {
         
         
 
-      <select name="topline"
-       id="topline"
-       className="form-control selectStyle ml-2 mb-2"
-       onChange={(e)=>{
-        //console.log("inside 111",e.target.value)
-        SetTopLine(e.target.value)
-        //console.log("iside onchange",topLine)
-        setRepo(e.target.value)
-        setCurrentPage(1)
-        if(e.target.value){
+        {IsAdminLoggedIn === "true" ? <select name="topline"
+          id="topline"
+          className="form-control selectStyle ml-2 mb-2"
+          onChange={(e) => {
+            //console.log("inside 111",e.target.value)
+            SetTopLine(e.target.value)
+            //console.log("iside onchange",topLine)
+            setRepo(e.target.value)
+            setCurrentPage(1)
+            if (e.target.value) {
 
-            GetFifthLine(e.target.value)
-        }
-       }}
-       value={topLine}
-      >
-        <option value="">Select Top Line</option>   
-         {topLineData && topLineData.map((e) => (
-        <option
-            key={e.user_id}
-            value={e.empcode}
+              GetFifthLine(e.target.value)
+            }
+          }}
+          value={topLine}
         >
-            {e.name}
-        </option>
-        ))}
-      </select>
+          <option value="">Select Top Line</option>
+          {topLineData && topLineData.map((e) => (
+            <option
+              key={e.user_id}
+              value={e.empcode}
+            >
+              {e.name}
+            </option>
+          ))}
+        </select> : ""}
 
-            
 
-      <select
-                  name=""
-                  id=""
-                  className="form-control selectStyle ml-2 mb-2"
-                  onChange={(e) => {
-                    SetFourthLine(e.target.value)
-                    setCurrentPage(1)
-                    if(e.target.value){
-                        GetFourthLine(e.target.value)
-                        setRepo(e.target.value)
-                    }
-                    else{
-                        setRepo(topLine)
-                    }
-                  }}
-                 value={fourthLine}
-                >
-                  {topLine === "" ? (
-                    <option value="">Reporting1</option>
-                  ) : (
-                    <>
-                      <option value="">Reporting1</option>
-
-                      {fifthline &&
-                        fifthline.map((e) => (
-                          <option key={e.user_id} value={e.empcode}>
-                            {e.name}
-                          </option>
-                        ))}
-                    </>
-                  )}
-                </select>
-
+        <select
+          name=""
+          id=""
+          className="form-control selectStyle ml-2 mb-2"
+          onChange={(e) => {
+            SetFourthLine(e.target.value)
+            setCurrentPage(1)
+            if (e.target.value) {
+              GetFourthLine(e.target.value)
+              setRepo(e.target.value)
+            }
+            else if (IsAdminLoggedIn === "false") {
+              setRepo(empLoggedIn)
+            } else {
+              setRepo(topLine)
+            }
+          }}
+          value={fourthLine}
+        >
+          {(topLine === "" && IsAdminLoggedIn === "true") ? (
+            <option value="">Reporting1</option>
+          ) : (
+            <>
+              <option value="">Reporting1</option>
+              {fifthline &&
+                fifthline.map((e) => (
+                  <option key={e.user_id} value={e.empcode}>
+                    {e.name}
+                  </option>
+                ))}
+            </>
+          )}
+        </select>
                 <select
                   name=""
                   id=""
@@ -640,7 +655,7 @@ const Report = () => {
                   }}
                  value={thirdLine}
                 >
-                  {topLine === "" || fourthLine === "" ? (
+                  {(topLine === "" && IsAdminLoggedIn ==="true") || fourthLine === "" ? (
                     <option value="">Reporting2</option>
                   ) : (
                     <>
@@ -672,7 +687,7 @@ const Report = () => {
                   }}
                   value={secondLine}
                   >
-                  {topLine === "" || fourthLine === "" || thirdLine === "" ? (
+                  {(topLine === "" && IsAdminLoggedIn==="true") || fourthLine === "" || thirdLine === "" ? (
                     <option value="">Reporting3</option>
                   ) : (
                     <>
@@ -704,7 +719,7 @@ const Report = () => {
                   }}
                   value={firstLine}
                   >
-                  {topLine === "" || fourthLine === "" || thirdLine === "" || secondLine=="" ? (
+                  {(topLine === "" && IsAdminLoggedIn==="true") || fourthLine === "" || thirdLine === "" || secondLine=="" ? (
                     <option value="">Reporting4</option>
                   ) : (
                     <>
@@ -736,7 +751,7 @@ const Report = () => {
                   }}
                   value={zeroLine}
                   >
-                  {topLine === "" || fourthLine === "" || thirdLine === "" || secondLine=="" || firstLine=="" ? (
+                  {(topLine === "" && IsAdminLoggedIn==="true") || fourthLine === "" || thirdLine === "" || secondLine=="" || firstLine=="" ? (
                     <option value="">Reporting5</option>
                   ) : (
                     <>
@@ -766,7 +781,7 @@ const Report = () => {
                     }
                   }}
                   >
-                  {topLine === "" || fourthLine === "" || thirdLine === "" || secondLine=="" || firstLine=="" || zeroLine=="" ? (
+                  {(topLine === "" && IsAdminLoggedIn==="true") || fourthLine === "" || thirdLine === "" || secondLine=="" || firstLine=="" || zeroLine=="" ? (
                     <option value="">Reporting6</option>
                   ) : (
                     <>
@@ -919,7 +934,7 @@ const Report = () => {
                   </div>
             </div> */}
 
-            {fromTop && fromTop.length>0 ?( <div className="table-responsive">
+            {fromTop && fromTop.length>0 /*&& IsAdminLoggedIn==="true"*/ ?( <div className="table-responsive">
                 <table className="table table-bordered" id="dataTable" width="100%" cellSpacing="0">
                     <thead>
                         <tr>

@@ -17,6 +17,7 @@ function Dashboard() {
    
     const [catData,SetCatData] = useState([]);
     const [filter,setFilter] = useState('')
+    const loginEmpCode = sessionStorage.getItem('empcode')
 
 
     const [name,SetName]= useState("");
@@ -98,7 +99,11 @@ function Dashboard() {
     
     async function GetCatData(){
         try {
-            const res = await axios.get(`${BASEURL}/admin/getSubCatData`);
+            const res = await axios.get(`${BASEURL}/admin/getSubCatData`,{
+              params:{
+                empcode:loginEmpCode
+              }
+            })
             
             console.log("cat responce",res.data)
             SetCatData(res.data);
@@ -537,13 +542,13 @@ return (
                 </div>
             </div>
         </div>
-       <div className="graphflex">
+       {/* <div className="graphflex">
        <div className="graphdiv1">
        <p className="camp-p">Camp Count</p>
         <Bar data={chartData} options={options}></Bar>
        </div>
         <div className="graphdiv2"><Bar data={chartData1} options={options1}></Bar></div>  
-        </div>        
+        </div>         */}
                         <div className="card shadow mb-4">
                             <div className="card-header py-3">
                                 <button onClick={handelReportDownload} className="d-none d-sm-inline-block btn btn-sm btn-info shadow-sm">

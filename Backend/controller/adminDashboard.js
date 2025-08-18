@@ -181,7 +181,7 @@ exports.totalPaDiagnosed = async (req, res) => {
 
 
 exports.getSubCatData = async (req, res) => {
-  //const { subCatId, rqId1,rqId2 } = req.body;
+  const { empcode } = req.query;
   try {
     const query1 = `SELECT
       subcat_id,
@@ -199,7 +199,7 @@ exports.getSubCatData = async (req, res) => {
   ) AS subcat_rn
   GROUP BY subcat_id;
   `;
-    const users = await new Promise((resolve, reject) => {
+    const subcats = await new Promise((resolve, reject) => {
       db.query(query1, (err, result) => {
         if (err) {
           logger.error(err.message);
@@ -211,14 +211,16 @@ exports.getSubCatData = async (req, res) => {
     });
 
     const reportData = [];
-    console.log(users);
-    for (const user of users) {
-      const query2 = "CALL GetSubCatData(?)";
+    console.log("subCat",subcats);
+    for (const subCat of subcats) {
+      const query2 = "CALL GetSubCatData_Hierarchy(?,?)";
+      // const query2 = "CALL GetSubCatData(?)";
       try {
         const result = await new Promise((resolve, reject) => {
           db.query(
             query2,
-            [user.subcat_id],
+            [empcode,subCat.subcat_id],
+            // [/*empcode,*/subCat.subcat_id],
             (err, result) => {
               if (err) {
                 logger.error(err.message);
