@@ -1302,7 +1302,7 @@ exports.getReportNumberWise = async (req, res) => {
   const { subCatId, startDate, endDate, empcode } = req.query;
   console.log("Params:", subCatId, startDate, endDate, empcode);
 
-  const query = 'CALL AV_GetCampReportFinalSummary_DateRange_NoTempTables(?,?,?,?)';
+  const query = 'CALL AV_GetCampReportFinalSummary_EmpCodeDateRange(?,?,?,?)';
 
   try {
     db.query(query, [empcode,subCatId, startDate, endDate], (err, result) => {

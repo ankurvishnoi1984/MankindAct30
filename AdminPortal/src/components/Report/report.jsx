@@ -16,8 +16,7 @@ const Report = () => {
     const [topLineData, SetTopLineData]= useState([]);
     const empLoggedIn = sessionStorage.getItem('empcode')
     const IsAdminLoggedIn = sessionStorage.getItem('IsAdminLoggedIn')
-    const [repo, setRepo] = useState(IsAdminLoggedIn==="true"?"":empLoggedIn);
-    // const [repo, setRepo] = useState("");
+    const [repo, setRepo] = useState(IsAdminLoggedIn==="true"?"10000000":empLoggedIn);
     const loggedInRole = sessionStorage.getItem('role')
     
     const [topLine,SetTopLine] = useState("")
@@ -173,10 +172,11 @@ const Report = () => {
 
         res = await axios.post(`${BASEURL}/admin/getReportFromTop?empcode=${repo}&startDate=${sDate}&endDate=${eDate}&subCatId=${subCatId}`)
       }
-      else{
-        setFromTop('')
-        return;
-      }
+      // Might need to change 
+      // else{
+      //   setFromTop('')
+      //   return;
+      // }
 
       setFromTop(res.data[0])
     } catch (error) {
@@ -271,7 +271,7 @@ const Report = () => {
       }
 
       // 🔍 one place to see which branch was taken
-      console.log("DownloadReportData branch:", branch,repo,res);
+      // console.log("DownloadReportData branch:", branch,repo,res);
 
       if (res.status === 200) {
         setDownloadReport(res.data);
@@ -310,7 +310,7 @@ const Report = () => {
 
     async function GetTopLine(){
         try {
-            const res = await axios.post(`${BASEURL}/admin/getEmp`,{empcode:0});
+            const res = await axios.post(`${BASEURL}/admin/getEmp`,{empcode:10000000});
             SetTopLineData(res.data)
         } catch (error) {
            console.log(error) 
@@ -581,14 +581,13 @@ const Report = () => {
           id="topline"
           className="form-control selectStyle ml-2 mb-2"
           onChange={(e) => {
-            //console.log("inside 111",e.target.value)
             SetTopLine(e.target.value)
-            //console.log("iside onchange",topLine)
-            setRepo(e.target.value)
             setCurrentPage(1)
             if (e.target.value) {
-
+              setRepo(e.target.value)
               GetFifthLine(e.target.value)
+            }else {
+              setRepo(empLoggedIn)
             }
           }}
           value={topLine}
@@ -820,15 +819,15 @@ const Report = () => {
     <div className="dropdown ml-2">
                                 
                                
-                                    {/* Dropdown items go here */}
-                                    <select className="form-control selectStyle" style={{marginTop:"32px"}} value={filter} name="filter" id="filter" onChange={(e)=>{
-                                        setFilter(e.target.value)
-                                    }}>
-                                         <option value="">Select Filter</option>
-                                         <option value="monthly">Month Wise</option>   
-                                         <option value="weekly">Week Wise</option>   
-                                    </select>
-                                    
+          {/* Dropdown items go here */}
+          <select className="form-control selectStyle" style={{ marginTop: "32px" }} value={filter} name="filter" id="filter" onChange={(e) => {
+            setFilter(e.target.value)
+          }}>
+            <option value="">Select Filter</option>
+            <option value="monthly">Month Wise</option>
+            <option value="weekly">Week Wise</option>
+          </select>
+
                                 
   </div>
          <div className="form-group ml-2">
@@ -950,22 +949,24 @@ const Report = () => {
                     </thead>
 
                     <tbody>
-                        {/* Repeat this row structure for each table row */}
-                        {fromTop && fromTop.map((e)=>{
-                            return(
-                           <tr key={e.empcode}>
-                            <td>{e.name}</td>
-                            <td>{e.TotalCampCount}</td>
-                            <td>{e.TotalDoctorCount}</td>
-                            <td>{e.TotalPatientScaneed}</td>
-                            <td>{e.TotalPatientDiagnosed}</td>
-                            <td>{e.TotalPrescribe}</td>
+                {/* Repeat this row structure for each table row */}
+                {console.log("From Top is shown")}
+                {fromTop && fromTop
+                  .filter(e => e.name !== "Admin")   // ✅ skip Admin rows
+                  .map((e) => (
+                    <tr key={e.empcode}>
+                      <td>{e.name}</td>
+                      <td>{e.TotalCampCount}</td>
+                      <td>{e.TotalDoctorCount}</td>
+                      <td>{e.TotalPatientScaneed}</td>
+                      <td>{e.TotalPatientDiagnosed}</td>
+                      <td>{e.TotalPrescribe}</td>
 
-                            {/* <td><button onClick ={()=>handelSingalReportDownload(e.emp_id)} style={{border:"none"}} className="btn-sm btn-primary btn-circle"><i className="fas fa-download"></i></button></td> */}
-                            {/* <td><button onClick ={()=>handelDownloadZip(e.emp_id)} style={{border:"none"}} className="btn-sm btn-primary btn-circle"><i className="fas fa-download"></i></button></td> */}
-                        </tr>
-                            )
-                        })}
+                      {/* <td><button onClick ={()=>handelSingalReportDownload(e.emp_id)} style={{border:"none"}} className="btn-sm btn-primary btn-circle"><i className="fas fa-download"></i></button></td> */}
+                      {/* <td><button onClick ={()=>handelDownloadZip(e.emp_id)} style={{border:"none"}} className="btn-sm btn-primary btn-circle"><i className="fas fa-download"></i></button></td> */}
+                    </tr>
+                  ))}
+
                         
                         {/* Repeat this row structure for each table row */}
                     </tbody>

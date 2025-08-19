@@ -28,10 +28,11 @@ const Login = () => {
         sessionStorage.setItem('userId',userId)
         sessionStorage.setItem('UserLoggedIn',"true")
         sessionStorage.setItem('EmployeeName',name)
-        if(role === "0" && res.data.errorCode === "1"){
+        // console.log(typeof(res.data.errorCode ),res.data.errorCode  === "1",res.data.errorCode  === 1)
+        if( role === 0 && res.data.errorCode === "1"){
             sessionStorage.setItem("IsAdminLoggedIn","true")
             navigate("/dashboard")
-        }else if(role !=="0" && res.data.errorCode === "1"){
+        }else if(role !==0 && res.data.errorCode === "1"){
             sessionStorage.setItem("IsAdminLoggedIn","false")
             navigate("/dashboard")
         }else{

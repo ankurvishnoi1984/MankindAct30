@@ -220,7 +220,9 @@ function Employee() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {empData && empData.map((e)=>{
+                                            {empData && empData
+                                            .filter(e => e.name !== "Admin")
+                                            .map((e)=>{
                                                 return (
 
                                             <tr key={e.user_id}>

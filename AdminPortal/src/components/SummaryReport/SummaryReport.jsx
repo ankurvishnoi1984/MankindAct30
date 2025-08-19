@@ -302,7 +302,9 @@ const SummaryReport = () => {
 
                     <tbody>
                         {/* Repeat this row structure for each table row */}
-                        {reportNumberWise && reportNumberWise.map((e)=>{
+                        {reportNumberWise && reportNumberWise
+                        .filter(e => e.name !== "Admin")
+                        .map((e)=>{
                             return(
                            <tr key={e.empcode}>
                             <td>{e.name}</td>
