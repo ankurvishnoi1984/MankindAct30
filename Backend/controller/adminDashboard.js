@@ -1561,9 +1561,11 @@ GROUP BY
     const { empcode,subCatId,startDate,endDate } = req.query;
     
      
-    const query = 'CALL AV_GetCampReportFinalSummary_EmpCodeDateRange(?,?,?,?)'
+    const giveManager = false;
+    // const query = 'CALL AV_GetCampReportFinalSummary_EmpCodeDateRange(?,?,?,?)'
+    const query = 'CALL AV_GetCampReportSummary_TwoLevel_Optimized(?,?,?,?,?)'
     try {
-      db.query(query,[empcode,subCatId,startDate,endDate] ,(err, result) => {
+      db.query(query,[empcode,subCatId,startDate,endDate,giveManager] ,(err, result) => {
         if (err) {
         logger.error(err.message);
 
@@ -1577,7 +1579,6 @@ GROUP BY
           });
         } else {
         logger.info('Fetched All Records From TopLine');
-
           res.status(200).json(result);
         }
       });

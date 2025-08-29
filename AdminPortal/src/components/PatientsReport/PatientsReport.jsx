@@ -165,7 +165,7 @@ const PatientsReport = () => {
                     <thead>
                         <tr>
                             <th>Employee Name</th>
-                            <th>Patients Name</th>
+                            {/* <th>Patients Name</th> */}
                             <th>Age</th>
                             <th>Gender</th>
                             <th>SBP</th>
@@ -186,7 +186,7 @@ const PatientsReport = () => {
                             return(
                            <tr key={e.pa_id}>
                             <td>{e.empname}</td>
-                            <td>{e.name}</td>
+                            {/* <td>{e.name}</td> */}
                             <td>{e.age}</td>
                             <td>{e.gender}</td>
                             <td>{e.sbp}</td>

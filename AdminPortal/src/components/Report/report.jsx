@@ -47,7 +47,6 @@ const Report = () => {
 
     const [fromTop, setFromTop]= useState([])
     
-    console.log("subcat",subCatId,"st",sDate,"ed",eDate);
 
    
     const [loading,setLoading] = useState(false)
@@ -103,7 +102,6 @@ const Report = () => {
 
 
   // for zip download 
-  console.log("date...............",sDate,eDate)
   const handelSearchDate = ()=>{
     if(!filter && sDate && eDate){
       GetDownloadReportData();
@@ -120,8 +118,6 @@ const Report = () => {
 
   const handelDownloadZip = async (userId)=>{
     const imagData = await getDownloadImageData(userId)
-     console.log(imagData)
-    console.log("runiing")
 
     const zip = new JSZip();
 
@@ -189,17 +185,17 @@ const Report = () => {
             
             let res;
              if(filter && subCatId){
-                //console.log("hellow........")
+                
              res = await axios.get(`${BASEURL}/admin/getReport?&filter=${filter}&subCatId=${subCatId}&empcode=${repo}&searchName=${searchQuery}&page=${currentPage}&limit=20`);
 
             }
             else if(sDate && eDate && subCatId){
-                //console.log("hellow........")
+                
              res = await axios.get(`${BASEURL}/admin/getReport?startDate=${sDate}&endDate=${eDate}&subCatId=${subCatId}&empcode=${repo}&searchName=${searchQuery}&page=${currentPage}&limit=20`);
 
             }
             else if(sDate && eDate){
-                //console.log("hellow........")
+                
              res = await axios.get(`${BASEURL}/admin/getReport?startDate=${sDate}&endDate=${eDate}&empcode=${repo}&searchName=${searchQuery}&page=${currentPage}&limit=20`);
 
             }
@@ -217,7 +213,6 @@ const Report = () => {
               
             }
 
-            //console.log(res)
             SetReportData(res.data.reportData)
             setPageLength(res.data.totalRowCount)
         } catch (error) {
@@ -271,7 +266,6 @@ const Report = () => {
       }
 
       // 🔍 one place to see which branch was taken
-      // console.log("DownloadReportData branch:", branch,repo,res);
 
       if (res.status === 200) {
         setDownloadReport(res.data);
@@ -292,10 +286,9 @@ const Report = () => {
     // async function GetReportDataForCat(subCatId,rqid1,rqid2){
     //     try {
     //         //const res = await axios.get(`${BASEURL}/admin/getReport?subCatId=${subCatId}&rqId1=${rqid1}&rqId2=${rqid2}`);
-    //         //console.log(res)
+    //         
     //         SetReportData(res.data)
     //     } catch (error) {
-    //        console.log(error) 
     //     }
     // }
 
@@ -528,7 +521,6 @@ const Report = () => {
             'Created At':item.created_date,
             'Modified At':item.modified_date
           }));
-          //console.log(mappedData);
           const ws = XLSX.utils.json_to_sheet(mappedData, { header: headers });
           const wb = XLSX.utils.book_new();
           XLSX.utils.book_append_sheet(wb, ws, 'employee');
@@ -546,13 +538,9 @@ const Report = () => {
     const rqid1 = selectedValues[1];
     const rqid2 = selectedValues[2];
     
-    //console.log(typeof(rqid1))
     // Handle the values here
-    console.log('Selected Subcat ID:', selectedSubcatId);
-    console.log('rqid1:', rqid1);
-    console.log('rqid2:', rqid2);
+
     if(selectedSubcatId=='null' || rqid1 === undefined  || rqid2=== undefined){
-        console.log("inside main")
         setSubCatId("");
         setRqid1("");
         setRqid2("");
@@ -565,8 +553,6 @@ const Report = () => {
     //GetReportDataForCat(selectedSubcatId,rqid1,rqid2)   
     }
 
-
-   console.log("selected subcat",subCatId)
    
   return loading ? <Loader/> :  (
     <div className="container-fluid">
@@ -829,37 +815,37 @@ const Report = () => {
           </select>
 
                                 
-  </div>
-         <div className="form-group ml-2">
-            <label htmlFor="fromDate">From Date:</label>
-            <input type="date" className="form-control" id="fromDate" placeholder="Select From Date" value={sDate} onChange={(e)=>setSDate(e.target.value)}/>
+        </div>
+        <div className="form-group ml-2">
+          <label htmlFor="fromDate">From Date:</label>
+          <input type="date" className="form-control" id="fromDate" placeholder="Select From Date" value={sDate} onChange={(e) => setSDate(e.target.value)} />
         </div>
 
         {/* Datepicker for "To" date */}
         <div className="form-group ml-2">
-            <label htmlFor="toDate">To Date:</label>
-            <input type="date" className="form-control" id="toDate" placeholder="Select To Date" value={eDate} onChange={(e)=>setEDate(e.target.value)}/>
+          <label htmlFor="toDate">To Date:</label>
+          <input type="date" className="form-control" id="toDate" placeholder="Select To Date" value={eDate} onChange={(e) => setEDate(e.target.value)} />
         </div>
 
-        <button className="btn btn-primary btn-icon-split" style={{marginTop:"30px", marginLeft:"5px"}} onClick={handelSearchDate}>
-                                <span className="text">Search</span>
-                                <span className="icon text-white-60">
-                                    <i className="fas fa-search fa-sm"></i>
-                                </span>
-                            </button>
+        <button className="btn btn-primary btn-icon-split" style={{ marginTop: "30px", marginLeft: "5px" }} onClick={handelSearchDate}>
+          <span className="text">Search</span>
+          <span className="icon text-white-60">
+            <i className="fas fa-search fa-sm"></i>
+          </span>
+        </button>
 
-    </div>
-    <div className="form-group ml-2 reposerch">
-    <div className="input-group">
-                                    <input type="text" className="form-control bg-light border-1 small" value={searchQuery}
-                  onChange={handleSearchChange} placeholder="Search for..." aria-label="Search" aria-describedby="basic-addon2" />
-                                    <div className="input-group-append">
-                                        <button className="btn btn-primary" type="button">
-                                            <i className="fas fa-search fa-sm"></i>
-                                        </button>
-                                    </div>
-                                </div>
+      </div>
+      <div className="form-group ml-2 reposerch">
+        <div className="input-group">
+          <input type="text" className="form-control bg-light border-1 small" value={searchQuery}
+            onChange={handleSearchChange} placeholder="Search for..." aria-label="Search" aria-describedby="basic-addon2" />
+          <div className="input-group-append">
+            <button className="btn btn-primary" type="button">
+              <i className="fas fa-search fa-sm"></i>
+            </button>
+          </div>
         </div>
+      </div>
         
 
     {/* Content Row */}
