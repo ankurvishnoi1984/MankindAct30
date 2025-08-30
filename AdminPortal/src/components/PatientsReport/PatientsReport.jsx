@@ -77,7 +77,7 @@ const PatientsReport = () => {
         // Define custom column headers
         const headers = [
                           'Employee Name',
-                          'Patients Name',
+                        //   'Patients Name',
                           'Age',
                           'Gender',
                           'SBP',
@@ -94,7 +94,7 @@ const PatientsReport = () => {
       
           const mappedData = patientsList.map(item => ({
                       'Employee Name': item.empname,
-                      'Patients Name': item.name,
+                    //   'Patients Name': item.name,
                       'Age': item.age,
                       'Gender': item.gender,
                       'SBP': item.sbp,
