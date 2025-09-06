@@ -97,71 +97,84 @@ const SummaryReport = () => {
 
    
     
-    const handelReportDownloadDetailed = ()=>{
-        // Define custom column headers
-        const headers = [
-            'Camp Report Id',
-            'Employee Code',
-            'Employee Name',
-            'Doctor Name',
-            'Doctor Code',
-            'Category',
-            'Screened Count',
-            'Diagnosed count',
-            'Prescription Count',
-            'Brand Names',
-            'Patients Name',
-            'Age',
-            'Gender',
-            'SBP',
-            'DBP',
-            'Hypertensive',
-            'TC',
-            'TG',
-            'HDL',
-            'LDL',
-            'HDL/LDL',
-            'Non HDL',
-            'Created At',
-            'Modified At'
-          ];
+  const handelReportDownloadDetailed = () => {
+    const headers = [
+      'Camp Report Id',
+      'Employee Code',
+      'Employee Name',
+      'Doctor Name',
+      'Doctor Code',
+      'Category',
+      'Screened Count',
+      'Diagnosed Count',
+      'Prescription Count',
+      // our brand name/count side by side
+      'Brand Name 1', 'Brand Count 1',
+      'Brand Name 2', 'Brand Count 2',
+      'Brand Name 3', 'Brand Count 3',
+      'Brand Name 4', 'Brand Count 4', // rolled up others
+      'Other Brands',
+      'Other Brand Counts',
+      'Age',
+      'Gender',
+      'SBP',
+      'DBP',
+      'Hypertensive',
+      'TC',
+      'TG',
+      'HDL',
+      'LDL',
+      'HDL/LDL',
+      'Hear Rate',
+      'Atrial Fibrillation',
+      'Created At',
+      'Modified At'
+    ];
 
-          
-      
-          // Map the data to match the custom column headers
-          const mappedData = allReportData.map(item => ({
-            'Camp Report Id':item.crid,
-            'Employee Code': item.empcode,
-            'Employee Name': item.username,
-            'Doctor Name': item.doctor_name,
-            'Doctor Code':item.code,
-            'Category':item.subcategory_name,
-            'Screened Count' : item.screened_count,
-            'Diagnosed count' : item.diagnosed_count,
-            'Prescription Count': item.prescription_count,
-            'Brand Names': item.brand_names,
-            'Patients Name': item.name,
-            'Age': item.age,
-            'Gender': item.gender,
-            'SBP': item.sbp,
-            'DBP': item.dbp,
-            'Hypertensive': item.isHypertensive,
-            'TC': item.tc,
-            'TG': item.tg,
-            'HDL': item.hdl,
-            'LDL': item.ldl,
-            'HDL/LDL': item.ldlhdl,
-            'Non HDL': item.nonhdl,
-            'Created At':item.created_date,
-            'Modified At':item.modified_date
-          }));
-      
-          const ws = XLSX.utils.json_to_sheet(mappedData, { header: headers });
-          const wb = XLSX.utils.book_new();
-          XLSX.utils.book_append_sheet(wb, ws, 'Data');
-          XLSX.writeFile(wb, 'AllCampReportData.xlsx');
-        
-       }
+    const mappedData = allReportData.map(item => ({
+      'Camp Report Id': item.crid,
+      'Employee Code': item.empcode,
+      'Employee Name': item.username,
+      'Doctor Name': item.doctor_name,
+      'Doctor Code': item.code,
+      'Category': item.subcategory_name,
+      'Screened Count': item.screened_count,
+      'Diagnosed Count': item.diagnosed_count,
+      'Prescription Count': item.prescription_count,
+
+      // brand name/count side by side
+      'Brand Name 1': item.brand_name1 || '',
+      'Brand Count 1': item.brand_count1 || '',
+      'Brand Name 2': item.brand_name2 || '',
+      'Brand Count 2': item.brand_count2 || '',
+      'Brand Name 3': item.brand_name3 || '',
+      'Brand Count 3': item.brand_count3 || '',
+      'Brand Name 4': item.brand_name4 || '',
+      'Brand Count 4': item.brand_count4,
+      'Other Brands': item.other_brands,
+      'Other Brand Counts': item.other_brand_count,
+
+      'Age': item.age,
+      'Gender': item.gender,
+      'SBP': item.sbp,
+      'DBP': item.dbp,
+      'Hypertensive': item.isHypertensive,
+      'TC': item.tc,
+      'TG': item.tg,
+      'HDL': item.hdl,
+      'LDL': item.ldl,
+      'HDL/LDL': item.ldlhdl,
+      'Hear Rate':item.heart_rate,
+      'Atrial Fibrillation':item.fibrillation,
+      'Created At': item.created_date,
+      'Modified At': item.modified_date
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(mappedData, { header: headers });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Data');
+    XLSX.writeFile(wb, 'AllCampReportData.xlsx');
+  };
 
 
 

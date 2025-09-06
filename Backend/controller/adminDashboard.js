@@ -1374,76 +1374,139 @@ function filterByHierarchy(rows, rootEmpcode) {
 
 
 exports.getReportDetailed = async (req, res) => {
-const query = `SELECT 
-    u1.empcode, 
-    u1.name AS username,
-    camp_report_mst.crid,
-    camp_report_mst.doctor_name,
-    camp_report_mst.code,
-    camp_report_mst.created_date, 
-    subcategory_mst.subcategory_name,
-    COALESCE(MAX(qcrm1.answer), 0) AS screened_count, 
-    COALESCE(MAX(qcrm2.answer), 0) AS diagnosed_count,
-    COALESCE(MAX(qcrm3.answer), 0) AS prescription_count,
-    COALESCE(GROUP_CONCAT(DISTINCT basic_mst.description ORDER BY basic_mst.description SEPARATOR ', '), 'N/A') AS brand_names,
-    
-    -- Patient details
-    p.pa_id, p.subcat_id, p.name AS patient_name, p.age, p.gender, p.bp, p.sbp, p.dbp,
-    p.isHypertensive, p.tc, p.tg, p.nonhdl, p.hdl, p.ldl, p.ldlhdl, 
-    p.created_date AS patient_created_date
+  const query = `
+    SELECT 
+        u1.empcode, 
+        u1.name AS username,
+        camp_report_mst.crid,
+        camp_report_mst.doctor_name,
+        camp_report_mst.code,
+        camp_report_mst.created_date,
+        camp_report_mst.camp_date,  /* added this */
+        subcategory_mst.subcategory_name,
 
-FROM camp_report_mst
+        /* screened / diagnosed / prescription counts */
+        COALESCE(MAX(qcrm1.answer), 0) AS screened_count, 
+        COALESCE(MAX(qcrm2.answer), 0) AS diagnosed_count,
+        COALESCE(MAX(qcrm3.answer), 0) AS prescription_count,
 
-LEFT JOIN user_mst u1 ON u1.user_id = camp_report_mst.user_id
-INNER JOIN subcategory_mst ON camp_report_mst.subcat_id = subcategory_mst.subcategory_id
+        /* All brand ids comma separated */
+        COALESCE(GROUP_CONCAT(DISTINCT qcrm_brand.brand_id), '') AS brand_id,
+        COALESCE(GROUP_CONCAT(DISTINCT qcrm_brand.brand_count), '') AS brand_count,
+        COALESCE(GROUP_CONCAT(DISTINCT qcrm_brand.other_brands), '') AS other_brands,
+        COALESCE(GROUP_CONCAT(DISTINCT qcrm_brand.other_brand_count), '') AS other_brand_count,
 
--- Question mappings
-LEFT JOIN question_camp_rep_mapping qcrm1 ON qcrm1.crid = camp_report_mst.crid AND qcrm1.rqid IN (1, 4, 7)  
-LEFT JOIN question_camp_rep_mapping qcrm2 ON qcrm2.crid = camp_report_mst.crid AND qcrm2.rqid IN (2, 5, 8)  
-LEFT JOIN question_camp_rep_mapping qcrm3 ON qcrm3.crid = camp_report_mst.crid AND qcrm3.rqid IN (3, 6, 9) 
+        /* Brand names (comma separated) */
+        COALESCE(
+          GROUP_CONCAT(
+            DISTINCT basic_mst.description ORDER BY basic_mst.description SEPARATOR ', '
+          ), 
+          'N/A'
+        ) AS brand_names,
+        
+        /* Patient details */
+        p.pa_id, p.subcat_id, p.name AS patient_name, p.age, p.gender, p.bp, p.sbp, p.dbp,
+        p.isHypertensive, p.tc, p.tg, p.nonhdl, p.hdl, p.ldl, p.ldlhdl, p.heart_rate,p.fibrillation,
+        p.created_date AS patient_created_date
 
--- Brands
-LEFT JOIN question_camp_rep_mapping qcrm_brand ON qcrm_brand.crid = camp_report_mst.crid  
-LEFT JOIN basic_mst ON FIND_IN_SET(basic_mst.basic_id, qcrm_brand.brand_id) > 0
+    FROM camp_report_mst
+    LEFT JOIN user_mst u1 
+      ON u1.user_id = camp_report_mst.user_id
+    INNER JOIN subcategory_mst 
+      ON camp_report_mst.subcat_id = subcategory_mst.subcategory_id
 
--- Patients (1 row per patient)
-LEFT JOIN patient_mst p ON p.crid = camp_report_mst.crid 
+    /* Question mappings */
+    LEFT JOIN question_camp_rep_mapping qcrm1 
+      ON qcrm1.crid = camp_report_mst.crid AND qcrm1.rqid IN (1, 4, 7)  
+    LEFT JOIN question_camp_rep_mapping qcrm2 
+      ON qcrm2.crid = camp_report_mst.crid AND qcrm2.rqid IN (2, 5, 8)  
+    LEFT JOIN question_camp_rep_mapping qcrm3 
+      ON qcrm3.crid = camp_report_mst.crid AND qcrm3.rqid IN (3, 6, 9) 
 
-WHERE camp_report_mst.status = 'Y'
+    /* Brands (we keep brand_id and brand_count raw) */
+    LEFT JOIN question_camp_rep_mapping qcrm_brand 
+      ON qcrm_brand.crid = camp_report_mst.crid  
+    LEFT JOIN basic_mst 
+      ON FIND_IN_SET(basic_mst.basic_id, qcrm_brand.brand_id) > 0
 
-GROUP BY 
-    camp_report_mst.crid, p.pa_id`
+    /* Patients (1 row per patient) */
+    LEFT JOIN patient_mst p 
+      ON p.crid = camp_report_mst.crid 
 
+    WHERE camp_report_mst.status = 'Y'
 
-    try {
-      db.query(query ,(err, result) => {
-        if (err) {
+    GROUP BY camp_report_mst.crid, p.pa_id
+  `;
+
+  try {
+    db.query(query, (err, result) => {
+      if (err) {
         logger.error(err.message);
+        res.status(500).json({
+          errorCode: '0',
+          errorDetail: err,
+          responseData: {},
+          status: 'ERROR',
+          details: 'An internal server error occurred',
+          getMessageInfo: 'An internal server error occurred'
+        });
+      } else {
+        const formattedResult = result.map((row) => {
+          const brandIds = row.brand_id ? row.brand_id.split(',') : [];
+          const brandCounts = row.brand_count ? row.brand_count.split(',') : [];
+          const brandNames =
+            row.brand_names && row.brand_names !== 'N/A'
+              ? row.brand_names.split(',').map((n) => n.trim())
+              : [];
 
-          res.status(500).json({
-            errorCode: "0",
-            errorDetail: err,
-            responseData: {},
-            status: "ERROR",
-            details: "An internal server error occurred",
-            getMessageInfo: "An internal server error occurred",
+          const formatted = {
+            ...row,
+            camp_date: row.camp_date
+              ? moment(row.camp_date).format('DD-MM-YYYY')
+              : null,
+            created_date: row.created_date
+              ? moment(row.created_date).format('DD-MM-YYYY HH:mm')
+              : null,
+            modified_date: row.modified_date
+              ? moment(row.modified_date).format('DD-MM-YYYY HH:mm')
+              : null
+          };
+
+          let otherNames = [];
+          let otherCounts = [];
+          brandNames.forEach((bn, i) => {
+            const count = brandCounts[i] || 0;
+            if (i < 3) {
+              formatted[`brand_name${i + 1}`] = bn;
+              formatted[`brand_count${i + 1}`] = count;
+            } else {
+              otherNames.push(bn);
+              otherCounts.push(Number(count) || 0);
+            }
           });
-        } else {
-        const formattedResult = result.map((row) => ({
-          ...row,
-          camp_date: moment(row.camp_date).format('DD-MM-YYYY'), 
-          created_date: moment(row.created_date).format('DD-MM-YYYY HH:mm'),
-          modified_date: moment(row.modified_date).format('DD-MM-YYYY HH:mm'),// Format the date here
-        }));
-          res.status(200).json(formattedResult);
-        }
-      });
-    } catch (error) {
-      logger.error(error.message);
 
-      res.json(error);
-    }
-  };
+          if (otherNames.length) {
+            formatted['brand_name4'] = otherNames.join(', ');
+            formatted['brand_count4'] = otherCounts.reduce(
+              (sum, c) => sum + c,
+              0
+            );
+          } else {
+            formatted['brand_name4'] = '';
+            formatted['brand_count4'] = '';
+          }
+
+          return formatted;
+        });
+
+        res.status(200).json(formattedResult);
+      }
+    });
+  } catch (error) {
+    logger.error(error.message);
+    res.json(error);
+  }
+};
 
 
   exports.getReportDetailed1 = async (req, res) => {

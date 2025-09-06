@@ -450,12 +450,11 @@ exports.addAnswer = async (req, res) => {
   const { dataArray } = req.body;
 
   // Create placeholders for each set of values
-  const placeholders = dataArray.map(() => "(?, ?, ?, ?, ?, ?, ?)").join(', ');
+  const placeholders = dataArray.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(', ');
    
   // Flatten the values into a single array
-  const values = dataArray.flatMap((data) => [data.rqid,data.subCatId,data.value,data.crid,data.brand_id,data.user_id,data.other_brands]);
-
-  const query = "INSERT INTO question_camp_rep_mapping (rqid, subcat_id, answer, crid, brand_id, created_by, other_brands) VALUES " + placeholders;
+  const values = dataArray.flatMap((data) => [data.rqid,data.subCatId,data.value,data.crid,data.brand_id,data.user_id,data.other_brands,data.brand_count,data.other_brand_count]);
+  const query = "INSERT INTO question_camp_rep_mapping (rqid, subcat_id, answer, crid, brand_id, created_by, other_brands,brand_count,other_brand_count) VALUES " + placeholders;
 
   try {
     db.query(query, values, (err, result) => {
@@ -562,15 +561,15 @@ exports.updateAnswer = (req, res) => {
     let hasErrorOccurred = false;
 
     dataArray.forEach((data, index) => {
-      const { rqid, crid, brand_id, value,other_brands } = data;
+      const { rqid, crid, brand_id, value,other_brands,brand_count,other_brand_count } = data;
 
       const updateQuery = `
         UPDATE question_camp_rep_mapping
-        SET answer = ?, brand_id = ?, other_brands = ?
+        SET answer = ?, brand_id = ?, other_brands = ?,brand_count=?,other_brand_count=?
         WHERE crid = ? AND rqid = ?;
       `;
 
-      db.query(updateQuery, [value, brand_id,other_brands, crid, rqid], (err, result) => {
+      db.query(updateQuery, [value, brand_id,other_brands,brand_count,other_brand_count, crid, rqid], (err, result) => {
         if (hasErrorOccurred) return;
 
         if (err) {
@@ -615,38 +614,23 @@ exports.updateAnswer = (req, res) => {
 
 exports.getAnswerWithId = async (req, res) => {
   const {crId} = req.body;
-  //const query = 'select rqid,answer,brand_id,status from question_camp_rep_mapping where crid = ?'
-  // const query = 'select question_camp_rep_mapping.rqid,question_camp_rep_mapping.answer,question_camp_rep_mapping.brand_id,question_camp_rep_mapping.status,basic_mst.description from question_camp_rep_mapping INNER JOIN basic_mst on question_camp_rep_mapping.brand_id= basic_mst.basic_id WHERE question_camp_rep_mapping.crid =?'
-//   const query = `
-//   SELECT
-//     rqid,
-//     answer,
-//     GROUP_CONCAT(basic_mst.basic_id) AS brand_id,
-//     GROUP_CONCAT(basic_mst.description) AS description,
-//     other_brands
-//   FROM
-//     question_camp_rep_mapping
-//     INNER JOIN basic_mst ON FIND_IN_SET(basic_mst.basic_id, question_camp_rep_mapping.brand_id)
-//   WHERE
-//     question_camp_rep_mapping.crid = ? and question_camp_rep_mapping.status='Y'
-//   GROUP BY
-//     rqid, answer,other_brands;
-// `;
 const query = `
 SELECT
     rqid,
     answer,
     other_brands,
+    brand_count,
+    other_brand_count,
     GROUP_CONCAT(basic_mst.basic_id) AS brand_id,
     GROUP_CONCAT(basic_mst.description) AS description
 FROM
-    mankindnewdb.question_camp_rep_mapping
+    question_camp_rep_mapping
     LEFT JOIN basic_mst ON FIND_IN_SET(basic_mst.basic_id, question_camp_rep_mapping.brand_id)
 WHERE
     question_camp_rep_mapping.crid = ?
     AND question_camp_rep_mapping.status = 'Y'
 GROUP BY
-    rqid, answer, other_brands;
+    rqid, answer, other_brands,brand_count,other_brand_count;
 `;
  
   try {
