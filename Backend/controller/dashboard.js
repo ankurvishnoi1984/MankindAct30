@@ -516,53 +516,82 @@ exports.getTotalDoctorAndCampCount = (req, res) => {
 
 // working code
 exports.getFilterCampReportCsv = async (req, res) => {
-  const { userId,subCatId,startDate, endDate, filterBy,empcode } = req.body; 
-//const query ='SELECT camp_report_mst.crid,camp_report_mst.doctor_name, camp_report_mst.camp_date, camp_report_mst.created_date, question_camp_rep_mapping.rqid, question_camp_rep_mapping.answer FROM camp_report_mst INNER JOIN question_camp_rep_mapping ON camp_report_mst.crid = question_camp_rep_mapping.crid;';
-//const query = 'SELECT camp_report_mst.crid,camp_report_mst.doctor_name, camp_report_mst.camp_date, camp_report_mst.created_date, question_camp_rep_mapping.rqid, question_camp_rep_mapping.answer FROM camp_report_mst INNER JOIN question_camp_rep_mapping ON camp_report_mst.user_id AND camp_report_mst.subcat_id = question_camp_rep_mapping.created_by AND question_camp_rep_mapping.subcat_id where camp_report_mst.user_id =1 AND camp_report_mst.subcat_id=1;'
-// working  const query = 'SELECT camp_report_mst.crid,camp_report_mst.doctor_name, camp_report_mst.camp_date, camp_report_mst.created_date, question_camp_rep_mapping.rqid, question_camp_rep_mapping.answer FROM camp_report_mst INNER JOIN question_camp_rep_mapping ON camp_report_mst.crid = question_camp_rep_mapping.crid WHERE question_camp_rep_mapping.subcat_id=? and question_camp_rep_mapping.created_by=?;'
- 
- //const query = 'CALL GetFilterCampReport(?,?)'
+  const { userId, subCatId, startDate, endDate, filterBy, empcode } = req.body;
 
- const query = `SELECT
-crid,
-doctor_name,
-code,
-created_date,
-rqid,
-answer,
-brand_id,
-other_brands,
-GROUP_CONCAT(DISTINCT description) AS description
-FROM (
-SELECT
-    camp_report_mst.crid,
-    camp_report_mst.doctor_name,
-    camp_report_mst.code,
-    camp_report_mst.created_date,
-    question_camp_rep_mapping.rqid,
-    question_camp_rep_mapping.answer,
-    question_camp_rep_mapping.brand_id,
-     question_camp_rep_mapping.other_brands,
-    basic_mst.description
-FROM
-    camp_report_mst
-INNER JOIN
-    question_camp_rep_mapping ON camp_report_mst.crid = question_camp_rep_mapping.crid
-INNER JOIN
-    basic_mst ON FIND_IN_SET(basic_mst.basic_id, question_camp_rep_mapping.brand_id)
-WHERE
- question_camp_rep_mapping.subcat_id=? and question_camp_rep_mapping.created_by=? 
- And camp_report_mst.status = 'Y' And question_camp_rep_mapping.status = 'Y'
-) AS subquery
-GROUP BY
-crid, doctor_name, code, created_date, rqid, answer, brand_id,other_brands;
-`
+
+  // Enhanced query with patient details and brand bifurcation similar to getReportDetailed
+  const query = `
+    SELECT
+        camp_report_mst.crid,
+        camp_report_mst.doctor_name,
+        camp_report_mst.code,
+        camp_report_mst.created_date,
+        camp_report_mst.camp_date,
+       
+        /* Question responses */
+        question_camp_rep_mapping.rqid,
+     GROUP_CONCAT(DISTINCT question_camp_rep_mapping.answer) AS answers,
+
+
+       
+        /* Brand information */
+        COALESCE(GROUP_CONCAT(DISTINCT question_camp_rep_mapping.brand_id), '') AS brand_id,
+        COALESCE(GROUP_CONCAT(DISTINCT question_camp_rep_mapping.brand_count), '') AS brand_count,
+        COALESCE(GROUP_CONCAT(DISTINCT question_camp_rep_mapping.other_brands), '') AS other_brands,
+        COALESCE(GROUP_CONCAT(DISTINCT question_camp_rep_mapping.other_brand_count), '') AS other_brand_count,
+       
+        /* Brand names (comma separated) */
+        COALESCE(
+          GROUP_CONCAT(
+            DISTINCT basic_mst.description ORDER BY basic_mst.description SEPARATOR ', '
+          ),
+          'N/A'
+        ) AS brand_names,
+       
+        /* Patient details */
+        p.pa_id,
+        p.subcat_id AS patient_subcat_id,
+        p.name AS patient_name,
+        p.age,
+        p.gender,
+        p.bp,
+        p.sbp,
+        p.dbp,
+        p.isHypertensive,
+        p.tc,
+        p.tg,
+        p.nonhdl,
+        p.hdl,
+        p.ldl,
+        p.ldlhdl,
+        p.heart_rate,
+        p.fibrillation,
+        p.created_date AS patient_created_date
  
- try {
-    db.query(query,[subCatId,userId], (err, result) => {
+ 
+    FROM camp_report_mst
+    INNER JOIN question_camp_rep_mapping
+      ON camp_report_mst.crid = question_camp_rep_mapping.crid
+    LEFT JOIN basic_mst
+      ON FIND_IN_SET(basic_mst.basic_id, question_camp_rep_mapping.brand_id) > 0
+    /* Add patient details */
+    LEFT JOIN patient_mst p
+      ON p.crid = camp_report_mst.crid
+   
+    WHERE question_camp_rep_mapping.subcat_id = ?
+      AND question_camp_rep_mapping.created_by = ?
+      AND camp_report_mst.status = 'Y'
+      AND question_camp_rep_mapping.status = 'Y'
+   
+    GROUP BY camp_report_mst.crid, question_camp_rep_mapping.rqid, p.pa_id
+    ORDER BY camp_report_mst.created_date DESC
+  `;
+
+
+  try {
+    db.query(query, [subCatId, userId], (err, result) => {
       if (err) {
-      logger.error(err.message);
-
+        logger.error(err.message);
         res.status(500).json({
           errorCode: 'INTERNAL_SERVER_ERROR',
           errorDetail: err.message,
@@ -574,56 +603,205 @@ crid, doctor_name, code, created_date, rqid, answer, brand_id,other_brands;
       } else {
         // Create an object to store the transformed data
         const transformedData = {};
-         
-        console.log("inside filterreport csv",result)
-        // Loop through the result to group by doctor_name and camp_date
-        result.forEach((row) => {
-          const { doctor_name, code, created_date, rqid, answer, description,other_brands} = row;
-          console.log("row data",row)
-          //const formattedDate = moment(created_date).format('DD-MM-YYYY hh:mm:ss a');
-                  //  const formattedDate2 = moment(camp_date).format('DD-MM-YYYY hh:mm:ss a');
-                    if (!transformedData[doctor_name]) {
-                      transformedData[doctor_name] = {
-                        'Doctor_Name': doctor_name,
-                        'Code': code,
-                        'Camp_Created_Date': created_date,
-                        'Brand_Name': `${description || ''}, ${other_brands || ''}`
-                  .split(',')
-                  .map(b => b.trim())
-                  .filter(Boolean)
-                  .join(', '),
-                        'No_of_Patient_Screened': 0,
-                        'No_of_Patient_Diagnosed': 0,
-                        'No_of_Rx_Generated': 0,
-                      };
-                    }
-                     //console.log("rqid", rqid)
-                    // Add the answer to the corresponding field
-                    if (rqid == 1 || rqid == 4 ||rqid == 7 ) {
-                      transformedData[doctor_name]['No_of_Patient_Screened'] = answer;
-                    } else if (rqid === 2 || rqid === 5 || rqid === 8 ) {
-                      transformedData[doctor_name]['No_of_Patient_Diagnosed'] = answer;
-                    } else if (rqid === 3 || rqid === 6 || rqid === 9) {
-                      transformedData[doctor_name]['No_of_Rx_Generated'] = answer;
-                    }
-                  });
-          
-                  // Convert the object values into an array
-                  const transformedArray = Object.values(transformedData);
-                   console.log("a2",transformedArray)
-                  // Define the fields for CSV columns
-                  const fields = ['Doctor_Name', 'Code', 'Camp_Created_Date', 'Brand_Name', 'No_of_Patient_Screened', 'No_of_Patient_Diagnosed', 'No_of_Prescription_Generated'];
 
-        // Apply different filters based on filterBy parameter
+
+        // Loop through the result to group by doctor_name and process data
+        result.forEach((row) => {
+          const {
+            crid, doctor_name, code, created_date, camp_date, rqid, answer,
+            brand_id, brand_count, other_brands, other_brand_count, brand_names,
+            pa_id, patient_name, age, gender, bp, sbp, dbp, isHypertensive,
+            tc, tg, nonhdl, hdl, ldl, ldlhdl, heart_rate, fibrillation,
+            patient_created_date
+          } = row;
+
+
+          console.log("row data", row);
+
+
+          // Create unique key for each camp report
+          const uniqueKey = `${doctor_name}_${code}_${crid}`;
+
+
+          if (!transformedData[uniqueKey]) {
+            // Brand bifurcation logic similar to getReportDetailed
+            const brandIds = brand_id ? brand_id.split(',') : [];
+            const brandCounts = brand_count ? brand_count.split(',') : [];
+            const brandNamesList = brand_names && brand_names !== 'N/A'
+              ? brand_names.split(',').map((n) => n.trim())
+              : [];
+
+
+            // Initialize brand fields
+            let brand_name1 = '', brand_count1 = 0;
+            let brand_name2 = '', brand_count2 = 0;
+            let brand_name3 = '', brand_count3 = 0;
+            let brand_name4 = '', brand_count4 = 0;
+
+
+            // Assign first 3 brands to individual fields
+            brandNamesList.forEach((bn, i) => {
+              const count = parseInt(brandCounts[i]) || 0;
+              if (i === 0) {
+                brand_name1 = bn;
+                brand_count1 = count;
+              } else if (i === 1) {
+                brand_name2 = bn;
+                brand_count2 = count;
+              } else if (i === 2) {
+                brand_name3 = bn;
+                brand_count3 = count;
+              } else {
+                // Combine remaining brands in brand_name4
+                if (brand_name4) {
+                  brand_name4 += ', ' + bn;
+                  brand_count4 += count;
+                } else {
+                  brand_name4 = bn;
+                  brand_count4 = count;
+                }
+              }
+            });
+
+
+            // Combine brand names and other brands for the original Brand_Name field
+            const allBrands = [
+              ...(brand_names && brand_names !== 'N/A' ? brand_names.split(',').map(b => b.trim()) : []),
+              ...(other_brands ? other_brands.split(',').map(b => b.trim()).filter(Boolean) : [])
+            ];
+
+
+            transformedData[uniqueKey] = {
+              'Doctor_Name': doctor_name,
+              'Code': code,
+              'Camp_Created_Date': created_date,
+              'Camp_Date': camp_date,
+
+
+
+
+              // Original fields
+              'No_of_Patient_Screened': 0,
+              'No_of_Patient_Diagnosed': 0,
+              'No_of_Rx_Generated': 0,
+
+
+              // Brand bifurcation fields
+              'Brand_Name_1': brand_name1,
+              'Brand_Count_1': brand_count1,
+              'Brand_Name_2': brand_name2,
+              'Brand_Count_2': brand_count2,
+              'Brand_Name_3': brand_name3,
+              'Brand_Count_3': brand_count3,
+              'Brand_Name_4': brand_name4,
+              'Brand_Count_4': brand_count4,
+              'Other_Brands': other_brands || '',
+              'Other_Brand_Count': other_brand_count || '',
+
+
+              // Patient details (will be arrays for multiple patients)
+              'Patient_Names': [],
+              'Patient_Ages': [],
+              'Patient_Genders': [],
+              'Patient_BP': [],
+              'Patient_SBP': [],
+              'Patient_DBP': [],
+              'Patient_Hypertensive': [],
+              'Patient_TC': [],
+              'Patient_TG': [],
+              'Patient_NONHDL': [],
+              'Patient_HDL': [],
+              'Patient_LDL': [],
+              'Patient_LDLHDL': [],
+              'Patient_Heart_Rate': [],
+              'Patient_Fibrillation': [],
+              'Patient_Created_Dates': []
+            };
+          }
+
+
+          // Add patient data if exists
+          if (pa_id && patient_name) {
+            const patientKey = `${pa_id}_${patient_name}`;
+            // Check if this patient is already added (to avoid duplicates)
+            if (!transformedData[uniqueKey]['Patient_Names'].includes(patient_name) ||
+              transformedData[uniqueKey]['Patient_Names'].length === 0) {
+
+
+              transformedData[uniqueKey]['Patient_Names'].push(patient_name || '');
+              transformedData[uniqueKey]['Patient_Ages'].push(age || '');
+              transformedData[uniqueKey]['Patient_Genders'].push(gender || '');
+              transformedData[uniqueKey]['Patient_BP'].push(bp || '');
+              transformedData[uniqueKey]['Patient_SBP'].push(sbp || '');
+              transformedData[uniqueKey]['Patient_DBP'].push(dbp || '');
+              transformedData[uniqueKey]['Patient_Hypertensive'].push(isHypertensive || '');
+              transformedData[uniqueKey]['Patient_TC'].push(tc || '');
+              transformedData[uniqueKey]['Patient_TG'].push(tg || '');
+              transformedData[uniqueKey]['Patient_NONHDL'].push(nonhdl || '');
+              transformedData[uniqueKey]['Patient_HDL'].push(hdl || '');
+              transformedData[uniqueKey]['Patient_LDL'].push(ldl || '');
+              transformedData[uniqueKey]['Patient_LDLHDL'].push(ldlhdl || '');
+              transformedData[uniqueKey]['Patient_Heart_Rate'].push(heart_rate || '');
+              transformedData[uniqueKey]['Patient_Fibrillation'].push(fibrillation || '');
+              transformedData[uniqueKey]['Patient_Created_Dates'].push(patient_created_date || '');
+            }
+          }
+
+
+          // Add the answer to the corresponding field (keeping original logic)
+          if (rqid == 1 || rqid == 4 || rqid == 7) {
+            transformedData[uniqueKey]['No_of_Patient_Screened'] = Math.max(
+              transformedData[uniqueKey]['No_of_Patient_Screened'],
+              parseInt(answer) || 0
+            );
+          } else if (rqid === 2 || rqid === 5 || rqid === 8) {
+            transformedData[uniqueKey]['No_of_Patient_Diagnosed'] = Math.max(
+              transformedData[uniqueKey]['No_of_Patient_Diagnosed'],
+              parseInt(answer) || 0
+            );
+          } else if (rqid === 3 || rqid === 6 || rqid === 9) {
+            transformedData[uniqueKey]['No_of_Rx_Generated'] = Math.max(
+              transformedData[uniqueKey]['No_of_Rx_Generated'],
+              parseInt(answer) || 0
+            );
+          }
+        });
+
+
+        // Convert arrays to comma-separated strings for CSV export
+        const transformedArray = Object.values(transformedData).map(item => ({
+          ...item,
+          'Patient_Names': item['Patient_Names'].join(', '),
+          'Patient_Ages': item['Patient_Ages'].join(', '),
+          'Patient_Genders': item['Patient_Genders'].join(', '),
+          'Patient_BP': item['Patient_BP'].join(', '),
+          'Patient_SBP': item['Patient_SBP'].join(', '),
+          'Patient_DBP': item['Patient_DBP'].join(', '),
+          'Patient_Hypertensive': item['Patient_Hypertensive'].join(', '),
+          'Patient_TC': item['Patient_TC'].join(', '),
+          'Patient_TG': item['Patient_TG'].join(', '),
+          'Patient_NONHDL': item['Patient_NONHDL'].join(', '),
+          'Patient_HDL': item['Patient_HDL'].join(', '),
+          'Patient_LDL': item['Patient_LDL'].join(', '),
+          'Patient_LDLHDL': item['Patient_LDLHDL'].join(', '),
+          'Patient_Heart_Rate': item['Patient_Heart_Rate'].join(', '),
+          'Patient_Fibrillation': item['Patient_Fibrillation'].join(', '),
+          'Patient_Created_Dates': item['Patient_Created_Dates'].join(', ')
+        }));
+
+
+
+        // Apply different filters based on filterBy parameter (keeping original logic)
         let filteredData = [];
 
+
         if (filterBy === 'month') {
-          // Filter by the last 30 days (month-wise)
           const thirtyDaysAgo = new Date();
           thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+
           filteredData = transformedArray.filter((item) => {
-            const itemDate = new Date(item.created_date);
+            const itemDate = new Date(item.Camp_Created_Date);
             return (
               (!startDate || itemDate >= new Date(startDate)) &&
               (!endDate || itemDate <= new Date(endDate)) &&
@@ -631,12 +809,12 @@ crid, doctor_name, code, created_date, rqid, answer, brand_id,other_brands;
             );
           });
         } else if (filterBy === 'week') {
-          // Filter by the last 7 days (week-wise)
           const sevenDaysAgo = new Date();
           sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+
           filteredData = transformedArray.filter((item) => {
-            const itemDate = new Date(item.created_date);
+            const itemDate = new Date(item.Camp_Created_Date);
             return (
               (!startDate || itemDate >= new Date(startDate)) &&
               (!endDate || itemDate <= new Date(endDate)) &&
@@ -644,9 +822,8 @@ crid, doctor_name, code, created_date, rqid, answer, brand_id,other_brands;
             );
           });
         } else {
-          // Custom filter, use the provided start and end dates
           filteredData = transformedArray.filter((item) => {
-            const itemDate = new Date(item.created_date);
+            const itemDate = new Date(item.Camp_Created_Date);
             return (
               (!startDate || itemDate >= new Date(startDate)) &&
               (!endDate || itemDate <= new Date(endDate))
@@ -654,158 +831,367 @@ crid, doctor_name, code, created_date, rqid, answer, brand_id,other_brands;
           });
         }
 
+
         // Sort the filtered data by created_date (ascending)
-        filteredData.sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
-        console.log("filterdata",filteredData)
-        const formattedResult = filteredData.map((item) => ({
-          ...item,
-          //Camp_Date: moment(item.created_date).format('DD-MM-YYYY'),
-          Camp_Created_Date: moment(item.Camp_Created_Date).format('DD-MM-YYYY'), // Convert date format
-           // Convert date format
-        }));
-        //const fields = ['doctor_name', 'camp_date', 'created_date', 'No of Patient Screened', 'No of Patient Diagnosed', 'No of Prescription Generated'];
+        filteredData.sort((a, b) => new Date(a.Camp_Created_Date) - new Date(b.Camp_Created_Date));
+        console.log("filterdata", filteredData);
+
+
+        // const formattedResult = filteredData.map((item) => ({
+        //   ...item,
+        //   Camp_Created_Date: moment(item.Camp_Created_Date).format('DD-MM-YYYY'),
+        //   Camp_Date: item.Camp_Date ? moment(item.Camp_Date).format('DD-MM-YYYY') : '',
+        // }));
+        const formattedResult = filteredData.map((item) => {
+          const { Patient_Names,Patient_Created_Dates, ...rest } = item; // strip names out
+          return {
+            ...rest,
+            Camp_Created_Date: moment(item.Camp_Created_Date).format('DD-MM-YYYY'),
+            Camp_Date: item.Camp_Date ? moment(item.Camp_Date).format('DD-MM-YYYY') : '',
+          };
+        });
+
+
         const ws = XLSX.utils.json_to_sheet(formattedResult);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Camp Report');
 
+
         const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
 
+
         res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.attachment('camp_report.xlsx');
-        res.send(buffer)
+        res.attachment('camp_report_detailed.xlsx');
+        res.send(buffer);
       }
     });
   } catch (error) {
     logger.error(error.message);
-
     res.json(error);
   }
 };
 
+
 exports.getFilterCampReportCsvWithId = async (req, res) => {
-  const {crId} = req.body
-// const query =
-//  'SELECT camp_report_mst.doctor_name, camp_report_mst.camp_date, camp_report_mst.created_date, question_camp_rep_mapping.rqid, question_camp_rep_mapping.answer FROM camp_report_mst INNER JOIN question_camp_rep_mapping ON camp_report_mst.crid = question_camp_rep_mapping.crid WHERE camp_report_mst.crid=?';
-// working  const query = 'SELECT camp_report_mst.crid,camp_report_mst.doctor_name, camp_report_mst.camp_date, camp_report_mst.created_date, question_camp_rep_mapping.rqid, question_camp_rep_mapping.answer,question_camp_rep_mapping.brand_id FROM camp_report_mst INNER JOIN question_camp_rep_mapping ON camp_report_mst.crid = question_camp_rep_mapping.crid WHERE camp_report_mst.crid=?;'
-// const query = 'CALL GetCampReportCsv(?,?)'
-
-const query = `SELECT
-crid,
-doctor_name,
-code,
-created_date,
-rqid,
-answer,
-brand_id,
-other_brands,
-GROUP_CONCAT(DISTINCT description) AS description
-FROM (
-SELECT
-    camp_report_mst.crid,
-    camp_report_mst.doctor_name,
-    camp_report_mst.code,
-    camp_report_mst.created_date,
-    question_camp_rep_mapping.rqid,
-    question_camp_rep_mapping.answer,
-    question_camp_rep_mapping.brand_id,
-    question_camp_rep_mapping.other_brands,
-    basic_mst.description
-FROM
-    camp_report_mst
-INNER JOIN
-    question_camp_rep_mapping ON camp_report_mst.crid = question_camp_rep_mapping.crid
-INNER JOIN
-    basic_mst ON FIND_IN_SET(basic_mst.basic_id, question_camp_rep_mapping.brand_id)
-WHERE
-    camp_report_mst.crid = ?
-    And camp_report_mst.status = 'Y'
-) AS subquery
-GROUP BY
-crid, doctor_name, code, created_date, rqid, answer, brand_id,other_brands;
-`
-try {
-  db.query(query, [crId], (err, result) => {
-    if (err) {
-      logger.error(err.message);
-
-      res.status(500).json({
-        errorCode: '0',
-        errorDetail: err.message,
-        responseData: {},
-        status: 'ERROR',
-        details: 'An internal server error occurred',
-        getMessageInfo: 'An internal server error occurred',
-      });
-    } else {
-      // Create an object to store the transformed data
-      const transformedData = {};
-      console.log("for brand id",result)   
-      // Loop through the result to group by doctor_name and camp_date
-      result.forEach((row) => {
-        const { doctor_name, code, created_date, rqid, answer,description,other_brands } = row;
-
-        const formattedDate = moment(created_date).format('DD-MM-YYYY hh:mm:ss a');
-        //const formattedDate2 = moment(camp_date).format('DD-MM-YYYY hh:mm:ss a');
-        if (!transformedData[doctor_name]) {
+  const { crId } = req.body;
+ 
+ 
+  // Enhanced query with patient details and brand bifurcation similar to getReportDetailed
+  const query = `
+    SELECT
+        camp_report_mst.crid,
+        camp_report_mst.doctor_name,
+        camp_report_mst.code,
+        camp_report_mst.created_date,
+        camp_report_mst.camp_date,
        
-          transformedData[doctor_name] = {
-            'Doctor Name': doctor_name,
-            'Code': code,
-            'Camp Created Date': formattedDate,
-           'Brand_Name': `${description || ''}, ${other_brands || ''}`
-                  .split(',')
-                  .map(b => b.trim())
-                  .filter(Boolean)
-                  .join(', '),
-            'No of Patient Screened': 0,
-            'No of Patient Diagnosed': 0,
-            'No of Rx Generated': 0,
+        /* Question responses */
+        question_camp_rep_mapping.rqid,
+      GROUP_CONCAT(DISTINCT question_camp_rep_mapping.answer) AS answers,
+       
+        /* Brand information */
+        COALESCE(GROUP_CONCAT(DISTINCT question_camp_rep_mapping.brand_id), '') AS brand_id,
+        COALESCE(GROUP_CONCAT(DISTINCT question_camp_rep_mapping.brand_count), '') AS brand_count,
+        COALESCE(GROUP_CONCAT(DISTINCT question_camp_rep_mapping.other_brands), '') AS other_brands,
+        COALESCE(GROUP_CONCAT(DISTINCT question_camp_rep_mapping.other_brand_count), '') AS other_brand_count,
+       
+        /* Brand names (comma separated) */
+        COALESCE(
+          GROUP_CONCAT(
+            DISTINCT basic_mst.description ORDER BY basic_mst.description SEPARATOR ', '
+          ),
+          'N/A'
+        ) AS brand_names,
+       
+        /* Patient details */
+        p.pa_id,
+        p.subcat_id AS patient_subcat_id,
+        p.name AS patient_name,
+        p.age,
+        p.gender,
+        p.bp,
+        p.sbp,
+        p.dbp,
+        p.isHypertensive,
+        p.tc,
+        p.tg,
+        p.nonhdl,
+        p.hdl,
+        p.ldl,
+        p.ldlhdl,
+        p.heart_rate,
+        p.fibrillation,
+        p.created_date AS patient_created_date
+ 
+ 
+    FROM camp_report_mst
+    INNER JOIN question_camp_rep_mapping
+      ON camp_report_mst.crid = question_camp_rep_mapping.crid
+    LEFT JOIN basic_mst
+      ON FIND_IN_SET(basic_mst.basic_id, question_camp_rep_mapping.brand_id) > 0
+    /* Add patient details */
+    LEFT JOIN patient_mst p
+      ON p.crid = camp_report_mst.crid
+   
+    WHERE camp_report_mst.crid = ?
+      AND camp_report_mst.status = 'Y'
+   
+    GROUP BY camp_report_mst.crid, question_camp_rep_mapping.rqid, p.pa_id
+    ORDER BY camp_report_mst.created_date DESC
+  `;
+ 
+ 
+  try {
+    db.query(query, [crId], (err, result) => {
+      if (err) {
+        logger.error(err.message);
+        res.status(500).json({
+          errorCode: '0',
+          errorDetail: err.message,
+          responseData: {},
+          status: 'ERROR',
+          details: 'An internal server error occurred',
+          getMessageInfo: 'An internal server error occurred',
+        });
+      } else {
+        // Create an object to store the transformed data
+        const transformedData = {};
+        console.log("for brand id", result);
+       
+        // Loop through the result to group by doctor_name and process data
+        result.forEach((row) => {
+          const {
+            crid, doctor_name, code, created_date, camp_date, rqid, answer,
+            brand_id, brand_count, other_brands, other_brand_count, brand_names,
+            pa_id, patient_name, age, gender, bp, sbp, dbp, isHypertensive,
+            tc, tg, nonhdl, hdl, ldl, ldlhdl, heart_rate, fibrillation,
+            patient_created_date
+          } = row;
+ 
+ 
+          const formattedDate = moment(created_date).format('DD-MM-YYYY hh:mm:ss a');
+         
+          // Create unique key for each camp report
+          const uniqueKey = `${doctor_name}_${code}_${crid}`;
+         
+          if (!transformedData[uniqueKey]) {
+            // Brand bifurcation logic similar to getReportDetailed
+            const brandIds = brand_id ? brand_id.split(',') : [];
+            const brandCounts = brand_count ? brand_count.split(',') : [];
+            const brandNamesList = brand_names && brand_names !== 'N/A'
+              ? brand_names.split(',').map((n) => n.trim())
+              : [];
+ 
+ 
+            // Initialize brand fields
+            let brand_name1 = '', brand_count1 = 0;
+            let brand_name2 = '', brand_count2 = 0;
+            let brand_name3 = '', brand_count3 = 0;
+            let brand_name4 = '', brand_count4 = 0;
+ 
+ 
+            // Assign first 3 brands to individual fields
+            brandNamesList.forEach((bn, i) => {
+              const count = parseInt(brandCounts[i]) || 0;
+              if (i === 0) {
+                brand_name1 = bn;
+                brand_count1 = count;
+              } else if (i === 1) {
+                brand_name2 = bn;
+                brand_count2 = count;
+              } else if (i === 2) {
+                brand_name3 = bn;
+                brand_count3 = count;
+              } else {
+                // Combine remaining brands in brand_name4
+                if (brand_name4) {
+                  brand_name4 += ', ' + bn;
+                  brand_count4 += count;
+                } else {
+                  brand_name4 = bn;
+                  brand_count4 = count;
+                }
+              }
+            });
+ 
+ 
+            // Combine brand names and other brands for the original Brand_Name field
+            const allBrands = [
+              ...(brand_names && brand_names !== 'N/A' ? brand_names.split(',').map(b => b.trim()) : []),
+              ...(other_brands ? other_brands.split(',').map(b => b.trim()).filter(Boolean) : [])
+            ];
+           
+            transformedData[uniqueKey] = {
+              // Original fields (maintaining exact field names from original)
+              'Doctor Name': doctor_name,
+              'Code': code,
+              'Camp Created Date': formattedDate,
+              'Camp Date': camp_date ? moment(camp_date).format('DD-MM-YYYY hh:mm:ss a') : '',
+              'No of Patient Screened': 0,
+              'No of Patient Diagnosed': 0,
+              'No of Rx Generated': 0,
+             
+              // Brand bifurcation fields
+              'Brand Name 1': brand_name1,
+              'Brand Count 1': brand_count1,
+              'Brand Name 2': brand_name2,
+              'Brand Count 2': brand_count2,
+              'Brand Name 3': brand_name3,
+              'Brand Count 3': brand_count3,
+              'Brand Name 4': brand_name4,
+              'Brand Count 4': brand_count4,
+              'Other Brands': other_brands || '',
+              'Other Brand Count': other_brand_count || '',
+             
+              // Patient details (will be arrays for multiple patients)
+              'Patient Names': [],
+              'Patient Ages': [],
+              'Patient Genders': [],
+              'Patient BP': [],
+              'Patient SBP': [],
+              'Patient DBP': [],
+              'Patient Hypertensive': [],
+              'Patient TC': [],
+              'Patient TG': [],
+              'Patient NONHDL': [],
+              'Patient HDL': [],
+              'Patient LDL': [],
+              'Patient LDLHDL': [],
+              'Patient Heart Rate': [],
+              'Patient Fibrillation': [],
+              'Patient Created Dates': []
+            };
+          }
+ 
+ 
+          // Add patient data if exists
+          if (pa_id && patient_name) {
+            // Check if this patient is already added (to avoid duplicates)
+            if (!transformedData[uniqueKey]['Patient Names'].includes(patient_name) ||
+                transformedData[uniqueKey]['Patient Names'].length === 0) {
+             
+              transformedData[uniqueKey]['Patient Names'].push(patient_name || '');
+              transformedData[uniqueKey]['Patient Ages'].push(age || '');
+              transformedData[uniqueKey]['Patient Genders'].push(gender || '');
+              transformedData[uniqueKey]['Patient BP'].push(bp || '');
+              transformedData[uniqueKey]['Patient SBP'].push(sbp || '');
+              transformedData[uniqueKey]['Patient DBP'].push(dbp || '');
+              transformedData[uniqueKey]['Patient Hypertensive'].push(isHypertensive || '');
+              transformedData[uniqueKey]['Patient TC'].push(tc || '');
+              transformedData[uniqueKey]['Patient TG'].push(tg || '');
+              transformedData[uniqueKey]['Patient NONHDL'].push(nonhdl || '');
+              transformedData[uniqueKey]['Patient HDL'].push(hdl || '');
+              transformedData[uniqueKey]['Patient LDL'].push(ldl || '');
+              transformedData[uniqueKey]['Patient LDLHDL'].push(ldlhdl || '');
+              transformedData[uniqueKey]['Patient Heart Rate'].push(heart_rate || '');
+              transformedData[uniqueKey]['Patient Fibrillation'].push(fibrillation || '');
+              transformedData[uniqueKey]['Patient Created Dates'].push(
+                patient_created_date ? moment(patient_created_date).format('DD-MM-YYYY hh:mm:ss a') : ''
+              );
+            }
+          }
+ 
+ 
+          // Add the answer to the corresponding field (keeping original logic)
+          if (rqid == 1 || rqid == 4 || rqid == 7) {
+            transformedData[uniqueKey]['No of Patient Screened'] = Math.max(
+              transformedData[uniqueKey]['No of Patient Screened'],
+              parseInt(answer) || 0
+            );
+          } else if (rqid === 2 || rqid === 5 || rqid === 8) {
+            transformedData[uniqueKey]['No of Patient Diagnosed'] = Math.max(
+              transformedData[uniqueKey]['No of Patient Diagnosed'],
+              parseInt(answer) || 0
+            );
+          } else if (rqid === 3 || rqid === 6 || rqid === 9) {
+            transformedData[uniqueKey]['No of Rx Generated'] = Math.max(
+              transformedData[uniqueKey]['No of Rx Generated'],
+              parseInt(answer) || 0
+            );
+          }
+        });
+ 
+ 
+        // Convert arrays to comma-separated strings for CSV export
+        const transformedArray = Object.values(transformedData).map(item => ({
+          ...item,
+          'Patient Names': item['Patient Names'].join(', '),
+          'Patient Ages': item['Patient Ages'].join(', '),
+          'Patient Genders': item['Patient Genders'].join(', '),
+          'Patient BP': item['Patient BP'].join(', '),
+          'Patient SBP': item['Patient SBP'].join(', '),
+          'Patient DBP': item['Patient DBP'].join(', '),
+          'Patient Hypertensive': item['Patient Hypertensive'].join(', '),
+          'Patient TC': item['Patient TC'].join(', '),
+          'Patient TG': item['Patient TG'].join(', '),
+          'Patient NONHDL': item['Patient NONHDL'].join(', '),
+          'Patient HDL': item['Patient HDL'].join(', '),
+          'Patient LDL': item['Patient LDL'].join(', '),
+          'Patient LDLHDL': item['Patient LDLHDL'].join(', '),
+          'Patient Heart Rate': item['Patient Heart Rate'].join(', '),
+          'Patient Fibrillation': item['Patient Fibrillation'].join(', '),
+          'Patient Created Dates': item['Patient Created Dates'].join(', ')
+        }));
+ 
+ 
+        console.log("Transformed data:", transformedData);
+        console.log("Transformed array:", transformedArray);
+ 
+ 
+        // Define the fields for CSV columns (keeping original fields + new ones)
+        const fields = [
+          'Doctor Name', 'Code', 'Camp Created Date', 'Camp Date', 'CRID', 'Brand_Name',
+          'No of Patient Screened', 'No of Patient Diagnosed', 'No of Rx Generated',
+          'Brand Name 1', 'Brand Count 1', 'Brand Name 2', 'Brand Count 2',
+          'Brand Name 3', 'Brand Count 3', 'Brand Name 4', 'Brand Count 4',
+          'Other Brands', 'Other Brand Count',
+          'Patient Names', 'Patient Ages', 'Patient Genders', 'Patient BP',
+          'Patient SBP', 'Patient DBP', 'Patient Hypertensive', 'Patient TC',
+          'Patient TG', 'Patient NONHDL', 'Patient HDL', 'Patient LDL',
+          'Patient LDLHDL', 'Patient Heart Rate', 'Patient Fibrillation',
+          'Patient Created Dates'
+        ];
+ 
+ 
+        // No additional date formatting needed as it's already done above
+        // const formattedResult = transformedArray;
+        const formattedResult = transformedArray.map(item => {
+          // destructure away the fields you don’t want
+          const {
+            ['Patient Names']: _patientNames,
+            ['Patient Created Dates']: _patientCreatedDates,
+            ...rest
+          } = item;
+
+          // do any date formatting you still want on rest
+          return {
+            ...rest,
+            Camp_Created_Date: moment(item.Camp_Created_Date).format('DD-MM-YYYY'),
+            Camp_Date: item.Camp_Date ? moment(item.Camp_Date).format('DD-MM-YYYY') : ''
           };
-        }
+        });
 
-        // Add the answer to the corresponding field
-        if (rqid == 1 || rqid == 4 ||rqid == 7 ) {
-          transformedData[doctor_name]['No of Patient Screened'] = answer;
-        } else if (rqid === 2 || rqid === 5 || rqid === 8) {
-          transformedData[doctor_name]['No of Patient Diagnosed'] = answer;
-        } else if (rqid === 3 || rqid === 6 || rqid === 9) {
-          transformedData[doctor_name]['No of Rx Generated'] = answer;
-        }
+ 
+ 
+        const ws = XLSX.utils.json_to_sheet(formattedResult);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Camp Report');
+ 
+ 
+        const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+ 
+ 
+        res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.attachment('camp_report_detailed_with_id.xlsx');
+        res.send(buffer);
+      }
+    });
+  } catch (error) {
+    logger.error(error.message);
+    res.json(error);
+  }
+ };
 
-
-        
-      });
-
-      // Convert the object values into an array
-      console.log(transformedData);
-      const transformedArray = Object.values(transformedData);
-      
-      // Define the fields for CSV columns
-      const fields = ['Doctor Name', 'Code', 'Camp Created Date', 'Brand Name',  'No of Patient Screened', 'No of Patient Diagnosed', 'No of Prescription Generated'];
-
-      const formattedResult = transformedArray.map((item) => ({
-        ...item,
-        //Camp_Date: moment(item.Camp_Date).format('DD-MM-YYYY'),
-        Camp_Created_Date: moment(item.Camp_Created_Date).format('DD-MM-YYYY'), // Convert date format
-         // Convert date format
-      }));
-   const ws = XLSX.utils.json_to_sheet(formattedResult);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Camp Report');
-
-      const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
-
-      res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.attachment('camp_report.xlsx');
-      res.send(buffer)
-    }
-  });
-} catch (error) {
-  logger.error(error.message);
-
-  res.json(error);
-}
-};
 
 
 // exports.getFilterCampReportCsv = async (req, res) => {
