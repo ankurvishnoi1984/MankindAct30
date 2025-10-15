@@ -186,7 +186,7 @@ function Employee() {
                             <form className="d-sm-inline-block form-inline mr-auto ml-md-3 my-2 my-md-0 mw-100 navbar-search">
                                 <div className="input-group">
                                     <input type="text" className="form-control bg-light border-1 small" 
-                                    // onChange={handleSearchChange}
+                                    onChange={handleSearchChange}
                                     placeholder="Search for..." aria-label="Search" aria-describedby="basic-addon2" />
                                     <div className="input-group-append">
                                         <button className="btn btn-primary" type="button">
@@ -282,21 +282,21 @@ function Employee() {
                 <div className="form-group col-md-6">
                   <label htmlFor="inputName4">Name Of Employee</label>
                   <input type="text" onChange={(e)=>{
-                      // SetName(e.target.value)
+                      SetName(e.target.value)
                   }} 
                   className="form-control" id="inputName4" name="name" placeholder="Name"  />
                 </div>
                 <div className="form-group col-md-6">
                   <label htmlFor="Code">Employee Code</label>
                   <input type="number" onChange={(e)=>{
-                      // SetEmpcode(e.target.value)
+                      SetEmpcode(e.target.value)
                   }}
                   className="form-control" id="Code" name="code" placeholder="Code"  />
                 </div>
                 <div className="form-group col-md-6">
                   <label htmlFor="state">State</label>
                   <input type="text" onChange={(e)=>{
-                      // SetState(e.target.value)
+                      SetState(e.target.value)
                   }}
                    className="form-control" id="state" name="state" placeholder="State"  />
                 </div>
@@ -311,7 +311,7 @@ function Employee() {
                   <label htmlFor="HQ">HQ</label>
                   <input type="text" 
                   onChange={(e)=>{
-                    // SetHq(e.target.value)
+                    SetHq(e.target.value)
                 }}
                  className="form-control" id="HQ" name="hq" placeholder="HQ"  />
                 </div>
@@ -319,21 +319,21 @@ function Employee() {
                   <label htmlFor="pincode">Pin Code</label>
                   <input type="number" 
                   onChange={(e)=>{
-                    // SetPincode(e.target.value)
+                    SetPincode(e.target.value)
                 }}
                 className="form-control" id="pincode" name="pincode" placeholder="Pin Code"  />
                 </div>
                 <div className="form-group col-md-6">
                   <label htmlFor="reporting">Reporting</label>
                   <input type="number" onChange={(e)=>{
-                      // SetReporting(e.target.value)
+                      SetReporting(e.target.value)
                   }}
                   className="form-control" id="reporting" name="reporting" placeholder="Employee Code"  />
                 </div>
                 <div className="form-group col-md-6">
                   <label htmlFor="inputState">Designation</label>
                   <select id="inputState" onChange={(e)=>{
-                      // SetRole(e.target.value)
+                      SetRole(e.target.value)
                   }}
                    className="form-control" name="designation" >
                     <option value={1}>Top Line</option>
@@ -349,7 +349,7 @@ function Employee() {
                 <div className="form-group col-md-6">
                   <label htmlFor="password">Password</label>
                   <input type="text" onChange={(e)=>{
-                      // SetPassword(e.target.value)
+                      SetPassword(e.target.value)
                   }}
                   className="form-control" id="password" name="password" placeholder="Password"  />
                 </div>
@@ -364,8 +364,8 @@ function Employee() {
     {showConfirmation && (
           <ConfirmationPopup
             message="Are you sure you want to Add Employee?"
-            // onConfirm={() => handleConfirm()}
-            // onCancel={handleCancel}
+            onConfirm={() => handleConfirm()}
+            onCancel={handleCancel}
           />
         )}
     </div>)}
@@ -373,8 +373,8 @@ function Employee() {
     {showConfirmationDel && (
           <ConfirmationPopup
             message="Are you sure you want to Delete Employee?"
-            // onConfirm={() => handleConfirmDel()}
-            // onCancel={handleCancelDel}
+            onConfirm={() => handleConfirmDel()}
+            onCancel={handleCancelDel}
           />
         )}
 
